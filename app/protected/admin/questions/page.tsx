@@ -3,8 +3,9 @@ import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
 import { listQuestions } from "@/lib/usecases/questions";
 import { listTopics } from "@/lib/usecases/topics";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function AdminQuestionsPage() {
+async function AdminQuestionsContent() {
   try {
     await requireAdmin();
   } catch (error) {
@@ -45,3 +46,10 @@ export default async function AdminQuestionsPage() {
   );
 }
 
+export default function AdminQuestionsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+      <AdminQuestionsContent />
+    </Suspense>
+  );
+}

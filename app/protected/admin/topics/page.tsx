@@ -2,8 +2,9 @@ import { TopicsManager } from "@/components/admin/topics-manager";
 import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
 import { listTopics } from "@/lib/usecases/topics";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function AdminTopicsPage() {
+async function AdminTopicsContent() {
   try {
     await requireAdmin();
   } catch (error) {
@@ -30,3 +31,10 @@ export default async function AdminTopicsPage() {
   );
 }
 
+export default function AdminTopicsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+      <AdminTopicsContent />
+    </Suspense>
+  );
+}

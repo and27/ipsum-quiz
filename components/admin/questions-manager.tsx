@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 interface QuestionsManagerProps {
@@ -312,6 +313,11 @@ export function QuestionsManager({
                   />
 
                   <div className="flex gap-2">
+                    <Button asChild type="button" variant="outline" disabled={busy}>
+                      <Link href={`/protected/admin/questions/${question.id}/options`}>
+                        Manage options
+                      </Link>
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
