@@ -1,19 +1,25 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
 import { InfoIcon } from "lucide-react";
 import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
 import { Suspense } from "react";
+import { getCurrentSessionContext } from "@/lib/usecases/auth";
 
 async function UserDetails() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-
-  if (error || !data?.claims) {
+  const session = await getCurrentSessionContext();
+  if (!session.userId) {
     redirect("/auth/login");
   }
 
-  return JSON.stringify(data.claims, null, 2);
+  return JSON.stringify(
+    {
+      userId: session.userId,
+      email: session.email,
+      role: session.role,
+    },
+    null,
+    2,
+  );
 }
 
 export default function ProtectedPage() {
