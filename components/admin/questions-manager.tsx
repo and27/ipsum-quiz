@@ -1,6 +1,8 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import type {
+  AdminImageUploadResponse,
   AdminQuestionCreateRequest,
   AdminQuestionResponse,
   AdminQuestionsListResponse,
@@ -13,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { prepareImageForUpload } from "@/lib/usecases/images/client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -53,6 +56,25 @@ function buildEditImageUrls(questions: Question[]): Record<string, string> {
   );
 }
 
+async function uploadAdminImage(
+  entityType: "question" | "option",
+  file: File,
+): Promise<string> {
+  const prepared = await prepareImageForUpload(file);
+  const formData = new FormData();
+  formData.set("entityType", entityType);
+  formData.set("original", prepared.originalFile);
+  formData.set("processedWebp", prepared.processedWebpFile);
+  formData.set("processedJpeg", prepared.processedJpegFile);
+
+  const response = await fetch("/api/admin/images/upload", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await parseApiResponse<AdminImageUploadResponse>(response);
+  return payload.asset.finalUrl;
+}
+
 export function QuestionsManager({
   initialQuestions,
   availableTopics,
@@ -62,7 +84,9 @@ export function QuestionsManager({
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUploadingCreateImage, setIsUploadingCreateImage] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
+  const [rowImageBusy, setRowImageBusy] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -142,6 +166,43 @@ export function QuestionsManager({
     }
   }
 
+  async function handleCreateImageUpload(file: File) {
+    setIsUploadingCreateImage(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const imageUrl = await uploadAdminImage("question", file);
+      setNewImageUrl(imageUrl);
+      setSuccessMessage("Image uploaded for new question.");
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to upload image.",
+      );
+    } finally {
+      setIsUploadingCreateImage(false);
+    }
+  }
+
+  async function handleRowImageUpload(questionId: string, file: File) {
+    setRowImageBusy((prev) => ({ ...prev, [questionId]: true }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const imageUrl = await uploadAdminImage("question", file);
+      setEditImageUrls((prev) => ({
+        ...prev,
+        [questionId]: imageUrl,
+      }));
+      setSuccessMessage("Image uploaded.");
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to upload image.",
+      );
+    } finally {
+      setRowImageBusy((prev) => ({ ...prev, [questionId]: false }));
+    }
+  }
+
   async function handleUpdateQuestion(
     question: Question,
     payload: AdminQuestionUpdateRequest,
@@ -201,8 +262,33 @@ export function QuestionsManager({
               placeholder="Image URL (optional)"
               value={newImageUrl}
               onChange={(event) => setNewImageUrl(event.target.value)}
-              disabled={isCreating}
+              disabled={isCreating || isUploadingCreateImage}
             />
+            {newImageUrl ? (
+              <img
+                src={newImageUrl}
+                alt="Question preview"
+                className="max-h-48 rounded border object-contain"
+              />
+            ) : null}
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={isCreating || isUploadingCreateImage}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) {
+                  return;
+                }
+                await handleCreateImageUpload(file);
+              }}
+            />
+            {isUploadingCreateImage ? (
+              <p className="text-xs text-muted-foreground">
+                Processing and uploading image...
+              </p>
+            ) : null}
 
             <Button type="submit" disabled={isCreating || !hasTopics}>
               {isCreating ? "Creating..." : "Create question"}
@@ -250,6 +336,7 @@ export function QuestionsManager({
           <div className="space-y-4">
             {questions.map((question) => {
               const busy = !!rowBusy[question.id];
+              const uploadingImage = !!rowImageBusy[question.id];
               const editedStatement = editStatements[question.id] ?? question.statement;
               const editedTopicId = editTopicIds[question.id] ?? question.topicId;
               const editedImageUrl = editImageUrls[question.id] ?? question.imageUrl ?? "";
@@ -286,7 +373,7 @@ export function QuestionsManager({
                         [question.id]: event.target.value,
                       }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   >
                     {availableTopics.map((topic) => (
                       <option key={topic.id} value={topic.id}>
@@ -304,7 +391,7 @@ export function QuestionsManager({
                         [question.id]: event.target.value,
                       }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   />
 
                   <Input
@@ -316,11 +403,36 @@ export function QuestionsManager({
                         [question.id]: event.target.value,
                       }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   />
+                  {editedImageUrl ? (
+                    <img
+                      src={editedImageUrl}
+                      alt="Question preview"
+                      className="max-h-48 rounded border object-contain"
+                    />
+                  ) : null}
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={busy || uploadingImage}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) {
+                        return;
+                      }
+                      await handleRowImageUpload(question.id, file);
+                    }}
+                  />
+                  {uploadingImage ? (
+                    <p className="text-xs text-muted-foreground">
+                      Processing and uploading image...
+                    </p>
+                  ) : null}
 
                   <div className="flex gap-2">
-                    <Button asChild type="button" variant="outline" disabled={busy}>
+                    <Button asChild type="button" variant="outline" disabled={busy || uploadingImage}>
                       <Link href={`/protected/admin/questions/${question.id}/options`}>
                         Manage options
                       </Link>
@@ -328,7 +440,7 @@ export function QuestionsManager({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || !hasChanges}
+                      disabled={busy || uploadingImage || !hasChanges}
                       onClick={() =>
                         handleUpdateQuestion(question, {
                           topicId: editedTopicId,
@@ -342,7 +454,11 @@ export function QuestionsManager({
                     <Button
                       type="button"
                       variant={question.isActive ? "secondary" : "default"}
-                      disabled={busy || (!question.isActive && !question.isBankReady)}
+                      disabled={
+                        busy ||
+                        uploadingImage ||
+                        (!question.isActive && !question.isBankReady)
+                      }
                       onClick={() =>
                         handleUpdateQuestion(question, {
                           isActive: !question.isActive,

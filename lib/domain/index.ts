@@ -1,5 +1,6 @@
 export type * from "./auth";
 export type * from "./common";
+export type * from "./image-asset";
 export type * from "./question-option";
 export type * from "./question";
 export type * from "./simulator";

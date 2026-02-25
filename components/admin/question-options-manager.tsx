@@ -1,6 +1,8 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import type {
+  AdminImageUploadResponse,
   AdminQuestionOptionCreateRequest,
   AdminQuestionOptionResponse,
   AdminQuestionOptionsListResponse,
@@ -12,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { prepareImageForUpload } from "@/lib/usecases/images/client";
 import { useMemo, useState } from "react";
 
 interface QuestionOptionsManagerProps {
@@ -53,6 +56,25 @@ function buildEditPosition(options: QuestionOption[]): Record<string, string> {
   );
 }
 
+async function uploadAdminImage(
+  entityType: "question" | "option",
+  file: File,
+): Promise<string> {
+  const prepared = await prepareImageForUpload(file);
+  const formData = new FormData();
+  formData.set("entityType", entityType);
+  formData.set("original", prepared.originalFile);
+  formData.set("processedWebp", prepared.processedWebpFile);
+  formData.set("processedJpeg", prepared.processedJpegFile);
+
+  const response = await fetch("/api/admin/images/upload", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await parseApiResponse<AdminImageUploadResponse>(response);
+  return payload.asset.finalUrl;
+}
+
 export function QuestionOptionsManager({
   questionId,
   initialOptions,
@@ -65,7 +87,9 @@ export function QuestionOptionsManager({
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUploadingCreateImage, setIsUploadingCreateImage] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
+  const [rowImageBusy, setRowImageBusy] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -109,6 +133,43 @@ export function QuestionOptionsManager({
       );
     } finally {
       setIsLoadingList(false);
+    }
+  }
+
+  async function handleCreateImageUpload(file: File) {
+    setIsUploadingCreateImage(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const imageUrl = await uploadAdminImage("option", file);
+      setNewImageUrl(imageUrl);
+      setSuccessMessage("Image uploaded for new option.");
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to upload image.",
+      );
+    } finally {
+      setIsUploadingCreateImage(false);
+    }
+  }
+
+  async function handleRowImageUpload(optionId: string, file: File) {
+    setRowImageBusy((prev) => ({ ...prev, [optionId]: true }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const imageUrl = await uploadAdminImage("option", file);
+      setEditImageUrl((prev) => ({
+        ...prev,
+        [optionId]: imageUrl,
+      }));
+      setSuccessMessage("Image uploaded.");
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to upload image.",
+      );
+    } finally {
+      setRowImageBusy((prev) => ({ ...prev, [optionId]: false }));
     }
   }
 
@@ -222,8 +283,33 @@ export function QuestionOptionsManager({
               placeholder="Image URL (optional)"
               value={newImageUrl}
               onChange={(event) => setNewImageUrl(event.target.value)}
-              disabled={isCreating}
+              disabled={isCreating || isUploadingCreateImage}
             />
+            {newImageUrl ? (
+              <img
+                src={newImageUrl}
+                alt="Option preview"
+                className="max-h-40 rounded border object-contain"
+              />
+            ) : null}
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={isCreating || isUploadingCreateImage}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) {
+                  return;
+                }
+                await handleCreateImageUpload(file);
+              }}
+            />
+            {isUploadingCreateImage ? (
+              <p className="text-xs text-muted-foreground">
+                Processing and uploading image...
+              </p>
+            ) : null}
             <Input
               type="number"
               min={1}
@@ -295,6 +381,7 @@ export function QuestionOptionsManager({
           <div className="space-y-3">
             {options.map((option) => {
               const busy = !!rowBusy[option.id];
+              const uploadingImage = !!rowImageBusy[option.id];
               const text = editText[option.id] ?? option.text;
               const imageUrl = editImageUrl[option.id] ?? option.imageUrl ?? "";
               const position = editPosition[option.id] ?? String(option.position);
@@ -319,7 +406,7 @@ export function QuestionOptionsManager({
                     onChange={(event) =>
                       setEditText((prev) => ({ ...prev, [option.id]: event.target.value }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   />
 
                   <Input
@@ -331,8 +418,33 @@ export function QuestionOptionsManager({
                         [option.id]: event.target.value,
                       }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   />
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt="Option preview"
+                      className="max-h-40 rounded border object-contain"
+                    />
+                  ) : null}
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={busy || uploadingImage}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) {
+                        return;
+                      }
+                      await handleRowImageUpload(option.id, file);
+                    }}
+                  />
+                  {uploadingImage ? (
+                    <p className="text-xs text-muted-foreground">
+                      Processing and uploading image...
+                    </p>
+                  ) : null}
 
                   <Input
                     type="number"
@@ -344,14 +456,14 @@ export function QuestionOptionsManager({
                         [option.id]: event.target.value,
                       }))
                     }
-                    disabled={busy}
+                    disabled={busy || uploadingImage}
                   />
 
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || !hasChanges}
+                      disabled={busy || uploadingImage || !hasChanges}
                       onClick={() =>
                         handleUpdateOption(option, {
                           text,
@@ -365,7 +477,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant={option.isCorrect ? "secondary" : "default"}
-                      disabled={busy || option.isCorrect}
+                      disabled={busy || uploadingImage || option.isCorrect}
                       onClick={() => handleUpdateOption(option, { isCorrect: true })}
                     >
                       {option.isCorrect ? "Current correct" : "Set correct"}
@@ -373,7 +485,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant={option.isActive ? "secondary" : "default"}
-                      disabled={busy}
+                      disabled={busy || uploadingImage}
                       onClick={() =>
                         handleUpdateOption(option, { isActive: !option.isActive })
                       }
@@ -383,7 +495,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant="destructive"
-                      disabled={busy}
+                      disabled={busy || uploadingImage}
                       onClick={() => handleDeleteOption(option)}
                     >
                       Delete
@@ -402,4 +514,3 @@ export function QuestionOptionsManager({
     </div>
   );
 }
-
