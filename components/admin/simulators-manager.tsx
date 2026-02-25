@@ -192,45 +192,75 @@ export function SimulatorsManager({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateSimulator} className="space-y-3">
-            <Input
-              placeholder="Simulator title"
-              value={newTitle}
-              onChange={(event) => setNewTitle(event.target.value)}
-              disabled={isCreating}
-            />
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              placeholder="Description (optional)"
-              value={newDescription}
-              onChange={(event) => setNewDescription(event.target.value)}
-              disabled={isCreating}
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label htmlFor="new-simulator-title" className="text-sm font-medium">
+                Title
+              </label>
               <Input
-                type="number"
-                min={1}
-                max={600}
-                placeholder="Duration minutes"
-                value={newDurationMinutes}
-                onChange={(event) => setNewDurationMinutes(event.target.value)}
-                disabled={isCreating}
-              />
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                placeholder="Max attempts"
-                value={newMaxAttempts}
-                onChange={(event) => setNewMaxAttempts(event.target.value)}
+                id="new-simulator-title"
+                placeholder="Simulator title"
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
                 disabled={isCreating}
               />
             </div>
-            <Input
-              placeholder="Access code (optional)"
-              value={newAccessCode}
-              onChange={(event) => setNewAccessCode(event.target.value)}
-              disabled={isCreating}
-            />
+            <div className="space-y-1">
+              <label htmlFor="new-simulator-description" className="text-sm font-medium">
+                Description
+              </label>
+              <textarea
+                id="new-simulator-description"
+                className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
+                placeholder="Description (optional)"
+                value={newDescription}
+                onChange={(event) => setNewDescription(event.target.value)}
+                disabled={isCreating}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label htmlFor="new-simulator-duration" className="text-sm font-medium">
+                  Duration (minutes)
+                </label>
+                <Input
+                  id="new-simulator-duration"
+                  type="number"
+                  min={1}
+                  max={600}
+                  placeholder="Duration minutes"
+                  value={newDurationMinutes}
+                  onChange={(event) => setNewDurationMinutes(event.target.value)}
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="new-simulator-max-attempts" className="text-sm font-medium">
+                  Max attempts
+                </label>
+                <Input
+                  id="new-simulator-max-attempts"
+                  type="number"
+                  min={1}
+                  max={20}
+                  placeholder="Max attempts"
+                  value={newMaxAttempts}
+                  onChange={(event) => setNewMaxAttempts(event.target.value)}
+                  disabled={isCreating}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="new-simulator-access-code" className="text-sm font-medium">
+                Access code
+              </label>
+              <Input
+                id="new-simulator-access-code"
+                placeholder="Access code (optional)"
+                value={newAccessCode}
+                onChange={(event) => setNewAccessCode(event.target.value)}
+                disabled={isCreating}
+              />
+            </div>
             <Button type="submit" disabled={isCreating}>
               {isCreating ? "Creating..." : "Create simulator"}
             </Button>
@@ -300,14 +330,22 @@ export function SimulatorsManager({
                   </div>
 
                   <Input
+                    id={`simulator-title-${simulator.id}`}
                     value={title}
                     onChange={(event) =>
                       setEditTitle((prev) => ({ ...prev, [simulator.id]: event.target.value }))
                     }
                     disabled={busy}
                   />
+                  <label
+                    htmlFor={`simulator-title-${simulator.id}`}
+                    className="sr-only"
+                  >
+                    Simulator title
+                  </label>
 
                   <textarea
+                    id={`simulator-description-${simulator.id}`}
                     className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
                     value={description}
                     onChange={(event) =>
@@ -318,9 +356,16 @@ export function SimulatorsManager({
                     }
                     disabled={busy}
                   />
+                  <label
+                    htmlFor={`simulator-description-${simulator.id}`}
+                    className="sr-only"
+                  >
+                    Simulator description
+                  </label>
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
+                      id={`simulator-duration-${simulator.id}`}
                       type="number"
                       min={1}
                       max={600}
@@ -333,8 +378,15 @@ export function SimulatorsManager({
                       }
                       disabled={busy}
                     />
+                    <label
+                      htmlFor={`simulator-duration-${simulator.id}`}
+                      className="sr-only"
+                    >
+                      Duration minutes
+                    </label>
 
                     <Input
+                      id={`simulator-max-attempts-${simulator.id}`}
                       type="number"
                       min={1}
                       max={20}
@@ -347,9 +399,16 @@ export function SimulatorsManager({
                       }
                       disabled={busy}
                     />
+                    <label
+                      htmlFor={`simulator-max-attempts-${simulator.id}`}
+                      className="sr-only"
+                    >
+                      Max attempts
+                    </label>
                   </div>
 
                   <Input
+                    id={`simulator-access-code-${simulator.id}`}
                     placeholder="New access code (leave empty to keep current)"
                     value={accessCode}
                     onChange={(event) =>
@@ -360,6 +419,12 @@ export function SimulatorsManager({
                     }
                     disabled={busy}
                   />
+                  <label
+                    htmlFor={`simulator-access-code-${simulator.id}`}
+                    className="sr-only"
+                  >
+                    New access code
+                  </label>
 
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -446,4 +511,3 @@ export function SimulatorsManager({
     </div>
   );
 }
-
