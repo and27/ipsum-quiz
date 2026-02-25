@@ -6,6 +6,7 @@ This folder contains the first SQL migrations for V1.
 1. `migrations/20260226_0001_init_schema.sql`
 2. `migrations/20260226_0002_indexes_triggers_functions.sql`
 3. `migrations/20260226_0003_rls_policies.sql`
+4. `migrations/20260226_0004_topics_active_name_unique.sql`
 
 ## Run manually in SQL Editor (copy/paste mode)
 Run the files in the exact order above.
@@ -31,4 +32,3 @@ from public.profiles
 order by created_at desc
 limit 20;
 ```
-

@@ -8,4 +8,4 @@ export {
   requireStudent,
   type AuthGuardReason,
 } from "./guards";
-
+export { mapAuthGuardErrorToResponse } from "./http";
