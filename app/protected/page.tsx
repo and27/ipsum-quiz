@@ -4,6 +4,7 @@ import { InfoIcon } from "lucide-react";
 import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
 import { Suspense } from "react";
 import { getCurrentSessionContext } from "@/lib/usecases/auth";
+import Link from "next/link";
 
 async function UserDetails() {
   const session = await getCurrentSessionContext();
@@ -19,6 +20,30 @@ async function UserDetails() {
     },
     null,
     2,
+  );
+}
+
+async function AdminQuickLinks() {
+  const session = await getCurrentSessionContext();
+  if (session.role !== "admin") {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Link
+        href="/protected/admin/topics"
+        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+      >
+        Manage topics
+      </Link>
+      <Link
+        href="/protected/admin/questions"
+        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+      >
+        Manage questions
+      </Link>
+    </div>
   );
 }
 
@@ -40,6 +65,9 @@ export default function ProtectedPage() {
           </Suspense>
         </pre>
       </div>
+      <Suspense>
+        <AdminQuickLinks />
+      </Suspense>
       <div>
         <h2 className="font-bold text-2xl mb-4">Next steps</h2>
         <FetchDataSteps />
