@@ -54,6 +54,9 @@ export async function PATCH(
       ) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
+      if (error.code === "question_not_ready") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       if (error.code === "not_found" || error.code === "topic_not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
@@ -65,4 +68,3 @@ export async function PATCH(
     );
   }
 }
-

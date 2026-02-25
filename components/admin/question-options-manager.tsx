@@ -6,6 +6,7 @@ import type {
   AdminQuestionOptionsListResponse,
   AdminQuestionOptionUpdateRequest,
   QuestionOption,
+  QuestionOptionIntegrity,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ import { useMemo, useState } from "react";
 interface QuestionOptionsManagerProps {
   questionId: string;
   initialOptions: QuestionOption[];
+  initialIntegrity: QuestionOptionIntegrity;
+  initialQuestionIsActive: boolean;
 }
 
 interface ApiErrorResponse {
@@ -53,8 +56,12 @@ function buildEditPosition(options: QuestionOption[]): Record<string, string> {
 export function QuestionOptionsManager({
   questionId,
   initialOptions,
+  initialIntegrity,
+  initialQuestionIsActive,
 }: QuestionOptionsManagerProps) {
   const [options, setOptions] = useState<QuestionOption[]>(initialOptions);
+  const [integrity, setIntegrity] = useState<QuestionOptionIntegrity>(initialIntegrity);
+  const [questionIsActive, setQuestionIsActive] = useState(initialQuestionIsActive);
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -78,10 +85,8 @@ export function QuestionOptionsManager({
   );
 
   const statsLabel = useMemo(() => {
-    const active = options.filter((option) => option.isActive).length;
-    const correct = options.filter((option) => option.isCorrect).length;
-    return `${options.length} options (${active} active, ${correct} correct)`;
-  }, [options]);
+    return `${options.length} options (${integrity.activeOptionsCount} active, ${integrity.activeCorrectOptionsCount} active correct)`;
+  }, [options.length, integrity.activeCorrectOptionsCount, integrity.activeOptionsCount]);
 
   async function loadOptions(nextIncludeInactive = includeInactive) {
     setIsLoadingList(true);
@@ -93,6 +98,8 @@ export function QuestionOptionsManager({
       );
       const payload = await parseApiResponse<AdminQuestionOptionsListResponse>(response);
       setOptions(payload.items);
+      setIntegrity(payload.integrity);
+      setQuestionIsActive(payload.questionIsActive);
       setEditText(buildEditText(payload.items));
       setEditImageUrl(buildEditImageUrl(payload.items));
       setEditPosition(buildEditPosition(payload.items));
@@ -262,6 +269,20 @@ export function QuestionOptionsManager({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">{statsLabel}</p>
+          <p
+            className={`text-sm ${
+              integrity.isReady ? "text-green-600" : "text-amber-600"
+            }`}
+          >
+            {integrity.isReady
+              ? "Question bank status: ready."
+              : "Question bank status: not ready (needs >=2 active options and exactly 1 active correct)."}
+          </p>
+          {questionIsActive ? (
+            <p className="text-sm text-muted-foreground">
+              This question is active. Some option changes are restricted to keep it valid.
+            </p>
+          ) : null}
 
           {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
           {successMessage ? (
@@ -344,12 +365,10 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant={option.isCorrect ? "secondary" : "default"}
-                      disabled={busy}
-                      onClick={() =>
-                        handleUpdateOption(option, { isCorrect: !option.isCorrect })
-                      }
+                      disabled={busy || option.isCorrect}
+                      onClick={() => handleUpdateOption(option, { isCorrect: true })}
                     >
-                      {option.isCorrect ? "Unset correct" : "Set correct"}
+                      {option.isCorrect ? "Current correct" : "Set correct"}
                     </Button>
                     <Button
                       type="button"

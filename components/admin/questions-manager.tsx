@@ -262,13 +262,20 @@ export function QuestionsManager({
               return (
                 <div key={question.id} className="space-y-3 rounded-lg border p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <Badge variant={question.isActive ? "default" : "secondary"}>
-                      {question.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Topic: {question.topicName}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={question.isActive ? "default" : "secondary"}>
+                        {question.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                      <Badge variant={question.isBankReady ? "default" : "outline"}>
+                        {question.isBankReady ? "Bank Ready" : "Bank Not Ready"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Topic: {question.topicName}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Active options: {question.activeOptionsCount} | Active correct:{" "}
+                    {question.activeCorrectOptionsCount}
+                  </p>
 
                   <select
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
@@ -335,7 +342,7 @@ export function QuestionsManager({
                     <Button
                       type="button"
                       variant={question.isActive ? "secondary" : "default"}
-                      disabled={busy}
+                      disabled={busy || (!question.isActive && !question.isBankReady)}
                       onClick={() =>
                         handleUpdateQuestion(question, {
                           isActive: !question.isActive,
@@ -345,6 +352,11 @@ export function QuestionsManager({
                       {question.isActive ? "Deactivate" : "Activate"}
                     </Button>
                   </div>
+                  {!question.isBankReady && !question.isActive ? (
+                    <p className="text-xs text-amber-600">
+                      To activate, this question needs at least 2 active options and exactly 1 active correct option.
+                    </p>
+                  ) : null}
                 </div>
               );
             })}

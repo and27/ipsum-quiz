@@ -1,7 +1,12 @@
-import type { QuestionOption } from "@/lib/domain/question-option";
+import type {
+  QuestionOption,
+  QuestionOptionIntegrity,
+} from "@/lib/domain/question-option";
 
 export interface AdminQuestionOptionsListResponse {
   items: QuestionOption[];
+  integrity: QuestionOptionIntegrity;
+  questionIsActive: boolean;
 }
 
 export interface AdminQuestionOptionCreateRequest {
@@ -23,4 +28,3 @@ export interface AdminQuestionOptionUpdateRequest {
 export interface AdminQuestionOptionResponse {
   option: QuestionOption;
 }
-

@@ -1,6 +1,6 @@
 import { QuestionOptionsManager } from "@/components/admin/question-options-manager";
 import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
-import { listQuestionOptions } from "@/lib/usecases/question-options";
+import { listQuestionOptionsWithState } from "@/lib/usecases/question-options";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -35,7 +35,7 @@ async function AdminQuestionOptionsContent({
     redirect("/protected/admin/questions");
   }
 
-  const options = await listQuestionOptions(questionId, true);
+  const optionsData = await listQuestionOptionsWithState(questionId, true);
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -49,7 +49,12 @@ async function AdminQuestionOptionsContent({
         </p>
       </div>
 
-      <QuestionOptionsManager questionId={questionId} initialOptions={options} />
+      <QuestionOptionsManager
+        questionId={questionId}
+        initialOptions={optionsData.items}
+        initialIntegrity={optionsData.integrity}
+        initialQuestionIsActive={optionsData.questionIsActive}
+      />
     </div>
   );
 }

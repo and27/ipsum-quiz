@@ -57,6 +57,7 @@ export async function PATCH(
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
       if (
+        error.code === "invalid_correct_state" ||
         error.code === "duplicate_correct_option" ||
         error.code === "duplicate_position"
       ) {
@@ -104,4 +105,3 @@ export async function DELETE(
     );
   }
 }
-

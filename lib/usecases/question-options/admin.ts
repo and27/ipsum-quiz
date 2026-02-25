@@ -1,4 +1,7 @@
-import type { QuestionOption } from "@/lib/domain/question-option";
+import type {
+  QuestionOption,
+  QuestionOptionIntegrity,
+} from "@/lib/domain/question-option";
 import { createClient } from "@/lib/supabase/server";
 
 export type QuestionOptionInputErrorCode =
@@ -8,7 +11,8 @@ export type QuestionOptionInputErrorCode =
   | "not_found"
   | "no_changes"
   | "duplicate_position"
-  | "duplicate_correct_option";
+  | "duplicate_correct_option"
+  | "invalid_correct_state";
 
 export class QuestionOptionInputError extends Error {
   readonly code: QuestionOptionInputErrorCode;
@@ -34,6 +38,12 @@ interface QuestionOptionUpdateInput {
   position?: number;
   isCorrect?: boolean;
   isActive?: boolean;
+}
+
+export interface QuestionOptionsListResult {
+  items: QuestionOption[];
+  integrity: QuestionOptionIntegrity;
+  questionIsActive: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -144,11 +154,13 @@ function parseOptionRow(row: unknown): QuestionOption | null {
   };
 }
 
-async function assertQuestionExists(questionId: string): Promise<void> {
+async function getQuestionRow(
+  questionId: string,
+): Promise<{ id: string; is_active: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("questions")
-    .select("id")
+    .select("id, is_active")
     .eq("id", questionId)
     .maybeSingle();
 
@@ -156,12 +168,14 @@ async function assertQuestionExists(questionId: string): Promise<void> {
     throw new Error(error.message);
   }
 
-  if (!data) {
+  if (!data || typeof data.id !== "string" || typeof data.is_active !== "boolean") {
     throw new QuestionOptionInputError(
       "question_not_found",
       "Question was not found.",
     );
   }
+
+  return { id: data.id, is_active: data.is_active };
 }
 
 function mapDatabaseError(error: unknown): never {
@@ -207,20 +221,149 @@ async function normalizePositions(questionId: string): Promise<void> {
   const rows = (data ?? []) as Array<{ id: string }>;
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    await supabase
+    const { error: tempError } = await supabase
       .from("question_options")
       .update({ position: -(index + 1) })
       .eq("id", row.id)
       .eq("question_id", questionId);
+    if (tempError) {
+      throw new Error(tempError.message);
+    }
   }
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    await supabase
+    const { error: finalError } = await supabase
       .from("question_options")
       .update({ position: index + 1 })
       .eq("id", row.id)
       .eq("question_id", questionId);
+    if (finalError) {
+      throw new Error(finalError.message);
+    }
+  }
+}
+
+async function getOptionRow(
+  questionId: string,
+  optionId: string,
+): Promise<{ id: string; is_active: boolean; is_correct: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("question_options")
+    .select("id, is_active, is_correct")
+    .eq("question_id", questionId)
+    .eq("id", optionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (
+    !data ||
+    typeof data.id !== "string" ||
+    typeof data.is_active !== "boolean" ||
+    typeof data.is_correct !== "boolean"
+  ) {
+    throw new QuestionOptionInputError("not_found", "Option was not found.");
+  }
+
+  return data;
+}
+
+export async function getQuestionOptionIntegrity(
+  questionId: string,
+): Promise<QuestionOptionIntegrity> {
+  await getQuestionRow(questionId);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("question_options")
+    .select("is_active, is_correct")
+    .eq("question_id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as Array<{ is_active: boolean; is_correct: boolean }>;
+  const activeOptionsCount = rows.filter((row) => row.is_active).length;
+  const activeCorrectOptionsCount = rows.filter(
+    (row) => row.is_active && row.is_correct,
+  ).length;
+
+  return {
+    activeOptionsCount,
+    activeCorrectOptionsCount,
+    isReady: activeOptionsCount >= 2 && activeCorrectOptionsCount === 1,
+  };
+}
+
+async function assertActiveQuestionIntegrityOnOptionUpdate(
+  questionId: string,
+  option: { is_active: boolean; is_correct: boolean },
+  input: QuestionOptionUpdateInput,
+): Promise<void> {
+  const question = await getQuestionRow(questionId);
+  if (!question.is_active) {
+    return;
+  }
+
+  if (input.isCorrect === false) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Cannot unset the correct option on an active question. Set another active option as correct.",
+    );
+  }
+
+  const integrity = await getQuestionOptionIntegrity(questionId);
+  const nextIsActive =
+    typeof input.isActive === "boolean" ? input.isActive : option.is_active;
+
+  if (option.is_active && !nextIsActive) {
+    if (integrity.activeOptionsCount <= 2) {
+      throw new QuestionOptionInputError(
+        "invalid_correct_state",
+        "Active questions must keep at least 2 active options.",
+      );
+    }
+
+    if (option.is_correct && input.isCorrect !== true) {
+      throw new QuestionOptionInputError(
+        "invalid_correct_state",
+        "Active questions must keep exactly one active correct option.",
+      );
+    }
+  }
+}
+
+async function assertActiveQuestionIntegrityOnOptionDelete(
+  questionId: string,
+  option: { is_active: boolean; is_correct: boolean },
+): Promise<void> {
+  const question = await getQuestionRow(questionId);
+  if (!question.is_active) {
+    return;
+  }
+
+  if (!option.is_active) {
+    return;
+  }
+
+  const integrity = await getQuestionOptionIntegrity(questionId);
+  if (integrity.activeOptionsCount <= 2) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Active questions must keep at least 2 active options.",
+    );
+  }
+
+  if (option.is_correct) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Active questions must keep exactly one active correct option.",
+    );
   }
 }
 
@@ -228,7 +371,7 @@ export async function listQuestionOptions(
   questionId: string,
   includeInactive = true,
 ): Promise<QuestionOption[]> {
-  await assertQuestionExists(questionId);
+  await getQuestionRow(questionId);
 
   const supabase = await createClient();
   let query = supabase
@@ -253,11 +396,28 @@ export async function listQuestionOptions(
     .filter((option): option is QuestionOption => !!option);
 }
 
+export async function listQuestionOptionsWithState(
+  questionId: string,
+  includeInactive = true,
+): Promise<QuestionOptionsListResult> {
+  const question = await getQuestionRow(questionId);
+  const [items, integrity] = await Promise.all([
+    listQuestionOptions(questionId, includeInactive),
+    getQuestionOptionIntegrity(questionId),
+  ]);
+
+  return {
+    items,
+    integrity,
+    questionIsActive: question.is_active,
+  };
+}
+
 export async function createQuestionOption(
   questionId: string,
   input: QuestionOptionCreateInput,
 ): Promise<QuestionOption> {
-  await assertQuestionExists(questionId);
+  await getQuestionRow(questionId);
 
   const supabase = await createClient();
   let nextPosition = 1;
@@ -280,6 +440,13 @@ export async function createQuestionOption(
     nextPosition = typeof maxRow?.position === "number" ? maxRow.position + 1 : 1;
   }
 
+  if (input.isCorrect === true && input.isActive === false) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Correct option must be active.",
+    );
+  }
+
   const { data, error } = await supabase
     .from("question_options")
     .insert({
@@ -287,7 +454,7 @@ export async function createQuestionOption(
       position: nextPosition,
       text: validateText(input.text),
       image_url: normalizeImageUrl(input.imageUrl),
-      is_correct: input.isCorrect ?? false,
+      is_correct: false,
       is_active: input.isActive ?? true,
     })
     .select(
@@ -304,6 +471,43 @@ export async function createQuestionOption(
     throw new Error("Invalid option payload returned from database.");
   }
 
+  if (input.isCorrect) {
+    const { error: rpcError } = await supabase.rpc("set_question_option_correct", {
+      p_question_id: questionId,
+      p_option_id: option.id,
+    });
+
+    if (rpcError) {
+      if (rpcError.message.includes("Correct option must be active")) {
+        throw new QuestionOptionInputError(
+          "invalid_correct_state",
+          "Correct option must be active.",
+        );
+      }
+      throw new Error(rpcError.message);
+    }
+
+    const { data: correctedData, error: correctedError } = await supabase
+      .from("question_options")
+      .select(
+        "id, question_id, position, text, image_url, is_correct, is_active, created_at, updated_at",
+      )
+      .eq("id", option.id)
+      .eq("question_id", questionId)
+      .single();
+
+    if (correctedError) {
+      throw new Error(correctedError.message);
+    }
+
+    const correctedOption = parseOptionRow(correctedData);
+    if (!correctedOption) {
+      throw new Error("Invalid option payload returned from database.");
+    }
+
+    return correctedOption;
+  }
+
   return option;
 }
 
@@ -312,7 +516,20 @@ export async function updateQuestionOption(
   optionId: string,
   input: QuestionOptionUpdateInput,
 ): Promise<QuestionOption> {
-  await assertQuestionExists(questionId);
+  await getQuestionRow(questionId);
+  const currentOption = await getOptionRow(questionId, optionId);
+  await assertActiveQuestionIntegrityOnOptionUpdate(
+    questionId,
+    currentOption,
+    input,
+  );
+
+  if (input.isCorrect === false) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Cannot unset the correct option directly. Set another active option as correct.",
+    );
+  }
 
   const payload: Record<string, unknown> = {};
   if (typeof input.text === "string") {
@@ -324,14 +541,19 @@ export async function updateQuestionOption(
   if (typeof input.position === "number") {
     payload.position = normalizePosition(input.position);
   }
-  if (typeof input.isCorrect === "boolean") {
-    payload.is_correct = input.isCorrect;
-  }
   if (typeof input.isActive === "boolean") {
     payload.is_active = input.isActive;
   }
 
-  if (Object.keys(payload).length === 0) {
+  if (input.isCorrect === true && payload.is_active === false) {
+    throw new QuestionOptionInputError(
+      "invalid_correct_state",
+      "Correct option must be active.",
+    );
+  }
+
+  const hasPayloadUpdates = Object.keys(payload).length > 0;
+  if (!hasPayloadUpdates && input.isCorrect !== true) {
     throw new QuestionOptionInputError(
       "no_changes",
       "No option changes were provided.",
@@ -339,25 +561,53 @@ export async function updateQuestionOption(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  if (hasPayloadUpdates) {
+    const { error } = await supabase
+      .from("question_options")
+      .update(payload)
+      .eq("id", optionId)
+      .eq("question_id", questionId);
+
+    if (error) {
+      mapDatabaseError(error);
+    }
+  }
+
+  if (input.isCorrect === true) {
+    const { error: rpcError } = await supabase.rpc("set_question_option_correct", {
+      p_question_id: questionId,
+      p_option_id: optionId,
+    });
+
+    if (rpcError) {
+      if (rpcError.message.includes("Correct option must be active")) {
+        throw new QuestionOptionInputError(
+          "invalid_correct_state",
+          "Correct option must be active.",
+        );
+      }
+      throw new Error(rpcError.message);
+    }
+  }
+
+  const { data: updatedData, error: updatedError } = await supabase
     .from("question_options")
-    .update(payload)
-    .eq("id", optionId)
-    .eq("question_id", questionId)
     .select(
       "id, question_id, position, text, image_url, is_correct, is_active, created_at, updated_at",
     )
+    .eq("id", optionId)
+    .eq("question_id", questionId)
     .maybeSingle();
 
-  if (error) {
-    mapDatabaseError(error);
+  if (updatedError) {
+    throw new Error(updatedError.message);
   }
 
-  if (!data) {
+  if (!updatedData) {
     throw new QuestionOptionInputError("not_found", "Option was not found.");
   }
 
-  const option = parseOptionRow(data);
+  const option = parseOptionRow(updatedData);
   if (!option) {
     throw new Error("Invalid option payload returned from database.");
   }
@@ -369,7 +619,9 @@ export async function deleteQuestionOption(
   questionId: string,
   optionId: string,
 ): Promise<void> {
-  await assertQuestionExists(questionId);
+  await getQuestionRow(questionId);
+  const currentOption = await getOptionRow(questionId, optionId);
+  await assertActiveQuestionIntegrityOnOptionDelete(questionId, currentOption);
 
   const supabase = await createClient();
   const { data, error } = await supabase

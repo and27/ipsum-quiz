@@ -7,8 +7,10 @@ export interface Question {
   statement: string;
   imageUrl: string | null;
   isActive: boolean;
+  activeOptionsCount: number;
+  activeCorrectOptionsCount: number;
+  isBankReady: boolean;
   createdBy: UUID;
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
 }
-

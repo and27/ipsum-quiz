@@ -5,7 +5,7 @@ import type {
 import { mapAuthGuardErrorToResponse, requireAdmin } from "@/lib/usecases/auth";
 import {
   createQuestionOption,
-  listQuestionOptions,
+  listQuestionOptionsWithState,
   QuestionOptionInputError,
 } from "@/lib/usecases/question-options";
 import { NextRequest, NextResponse } from "next/server";
@@ -27,8 +27,12 @@ export async function GET(
 
     const includeInactive =
       request.nextUrl.searchParams.get("includeInactive") !== "false";
-    const items = await listQuestionOptions(questionId, includeInactive);
-    const response: AdminQuestionOptionsListResponse = { items };
+    const data = await listQuestionOptionsWithState(questionId, includeInactive);
+    const response: AdminQuestionOptionsListResponse = {
+      items: data.items,
+      integrity: data.integrity,
+      questionIsActive: data.questionIsActive,
+    };
     return NextResponse.json(response);
   } catch (error) {
     const authResponse = mapAuthGuardErrorToResponse(error);
@@ -91,6 +95,7 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
       if (
+        error.code === "invalid_correct_state" ||
         error.code === "duplicate_correct_option" ||
         error.code === "duplicate_position"
       ) {
@@ -105,4 +110,3 @@ export async function POST(
     );
   }
 }
-

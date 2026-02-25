@@ -7,7 +7,8 @@ export type QuestionInputErrorCode =
   | "invalid_statement"
   | "not_found"
   | "topic_not_found"
-  | "no_changes";
+  | "no_changes"
+  | "question_not_ready";
 
 export class QuestionInputError extends Error {
   readonly code: QuestionInputErrorCode;
@@ -29,6 +30,12 @@ interface RawQuestionRow {
   created_at: string;
   updated_at: string;
   topics: { name?: unknown } | Array<{ name?: unknown }> | null;
+}
+
+interface QuestionOptionStats {
+  activeOptionsCount: number;
+  activeCorrectOptionsCount: number;
+  isBankReady: boolean;
 }
 
 interface QuestionListResult {
@@ -120,7 +127,17 @@ function extractTopicName(
   return typeof topics.name === "string" ? topics.name : fallbackTopicId;
 }
 
-function mapQuestion(row: RawQuestionRow): Question {
+function defaultQuestionOptionStats(): QuestionOptionStats {
+  return {
+    activeOptionsCount: 0,
+    activeCorrectOptionsCount: 0,
+    isBankReady: false,
+  };
+}
+
+function mapQuestion(row: RawQuestionRow, stats?: QuestionOptionStats): Question {
+  const optionStats = stats ?? defaultQuestionOptionStats();
+
   return {
     id: row.id,
     topicId: row.topic_id,
@@ -128,6 +145,9 @@ function mapQuestion(row: RawQuestionRow): Question {
     statement: row.statement,
     imageUrl: row.image_url,
     isActive: row.is_active,
+    activeOptionsCount: optionStats.activeOptionsCount,
+    activeCorrectOptionsCount: optionStats.activeCorrectOptionsCount,
+    isBankReady: optionStats.isBankReady,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -166,6 +186,64 @@ async function assertTopicExists(topicId: string): Promise<void> {
   }
 }
 
+async function getQuestionOptionStatsMap(
+  questionIds: string[],
+): Promise<Map<string, QuestionOptionStats>> {
+  const statsMap = new Map<string, QuestionOptionStats>();
+  if (questionIds.length === 0) {
+    return statsMap;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("question_options")
+    .select("question_id, is_active, is_correct")
+    .in("question_id", questionIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as Array<{
+    question_id: string;
+    is_active: boolean;
+    is_correct: boolean;
+  }>;
+
+  for (const row of rows) {
+    if (!statsMap.has(row.question_id)) {
+      statsMap.set(row.question_id, defaultQuestionOptionStats());
+    }
+    const current = statsMap.get(row.question_id);
+    if (!current) {
+      continue;
+    }
+
+    if (row.is_active) {
+      current.activeOptionsCount += 1;
+      if (row.is_correct) {
+        current.activeCorrectOptionsCount += 1;
+      }
+    }
+  }
+
+  for (const [questionId, current] of statsMap.entries()) {
+    statsMap.set(questionId, {
+      ...current,
+      isBankReady:
+        current.activeOptionsCount >= 2 &&
+        current.activeCorrectOptionsCount === 1,
+    });
+  }
+
+  return statsMap;
+}
+
+async function getQuestionOptionStats(questionId: string): Promise<QuestionOptionStats> {
+  const statsMap = await getQuestionOptionStatsMap([questionId]);
+  return statsMap.get(questionId) ?? defaultQuestionOptionStats();
+}
+
 export async function listQuestions(
   query: AdminQuestionsListQuery,
 ): Promise<QuestionListResult> {
@@ -197,9 +275,11 @@ export async function listQuestions(
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const rows = (data ?? []) as RawQuestionRow[];
+  const statsMap = await getQuestionOptionStatsMap(rows.map((row) => row.id));
 
   return {
-    items: ((data ?? []) as RawQuestionRow[]).map(mapQuestion),
+    items: rows.map((row) => mapQuestion(row, statsMap.get(row.id))),
     page,
     pageSize,
     total,
@@ -221,7 +301,7 @@ export async function createQuestion(input: QuestionCreateInput): Promise<Questi
       topic_id: topicId,
       statement,
       image_url: imageUrl,
-      is_active: true,
+      is_active: false,
       created_by: input.createdBy,
     })
     .select(
@@ -233,7 +313,7 @@ export async function createQuestion(input: QuestionCreateInput): Promise<Questi
     throw new Error(error.message);
   }
 
-  return mapQuestion(data as RawQuestionRow);
+  return mapQuestion(data as RawQuestionRow, defaultQuestionOptionStats());
 }
 
 export async function updateQuestion(
@@ -261,6 +341,15 @@ export async function updateQuestion(
   }
 
   if (typeof input.isActive === "boolean") {
+    if (input.isActive) {
+      const stats = await getQuestionOptionStats(questionId);
+      if (!stats.isBankReady) {
+        throw new QuestionInputError(
+          "question_not_ready",
+          "Question cannot be activated until it has at least 2 active options and exactly 1 active correct option.",
+        );
+      }
+    }
     payload.is_active = input.isActive;
   }
 
@@ -286,6 +375,7 @@ export async function updateQuestion(
     throw new QuestionInputError("not_found", "Question was not found.");
   }
 
-  return mapQuestion(data as RawQuestionRow);
+  const stats = await getQuestionOptionStats(questionId);
+  return mapQuestion(data as RawQuestionRow, stats);
 }
 

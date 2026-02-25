@@ -12,3 +12,8 @@ export interface QuestionOption {
   updatedAt: ISODateTimeString;
 }
 
+export interface QuestionOptionIntegrity {
+  activeOptionsCount: number;
+  activeCorrectOptionsCount: number;
+  isReady: boolean;
+}
