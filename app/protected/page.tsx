@@ -43,6 +43,12 @@ async function AdminQuickLinks() {
       >
         Manage questions
       </Link>
+      <Link
+        href="/protected/admin/simulators"
+        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+      >
+        Manage simulators
+      </Link>
     </div>
   );
 }
