@@ -24,6 +24,7 @@ export interface StartAttemptResponse {
   resumed: boolean;
   expiresAt: ISODateTimeString;
   questionsTotal: number;
+  simulatorVersionId: UUID;
 }
 
 export interface SaveAttemptAnswerRequest {
