@@ -2,6 +2,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AuthButton } from "@/components/auth-button";
 import { getCurrentSessionContext } from "@/lib/usecases/auth";
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -33,8 +34,16 @@ async function ProtectedLayoutContent({
         <nav className="w-full border-b border-b-foreground/10">
           <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 text-sm">
             <div className="flex items-center gap-4">
-              <Link href="/" className="font-semibold">
-                Ipsum Solutio
+              <Link href="/" className="flex items-center gap-2 font-semibold">
+                <Image
+                  src="/logo.png"
+                  alt="Logo Ipsum Solutio"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 object-contain"
+                  priority
+                />
+                <span>Ipsum Solutio</span>
               </Link>
               <span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
                 {isAdmin ? "Administrador" : "Estudiante"}
