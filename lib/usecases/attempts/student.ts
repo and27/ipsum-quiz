@@ -1,4 +1,5 @@
 import type {
+  SaveAttemptAnswerResponse,
   StartAttemptResponse,
   StudentActiveAttemptAnswer,
   StudentActiveAttemptResponse,
@@ -13,7 +14,11 @@ export type StudentAttemptErrorCode =
   | "simulator_not_available"
   | "max_attempts_reached"
   | "version_has_no_questions"
-  | "active_attempt_not_found";
+  | "active_attempt_not_found"
+  | "attempt_not_found"
+  | "attempt_not_active"
+  | "answer_not_found"
+  | "option_not_found";
 
 export class StudentAttemptError extends Error {
   readonly code: StudentAttemptErrorCode;
@@ -45,6 +50,11 @@ interface RawAttemptRow {
 
 interface RawAnswerRow {
   simulator_version_question_id: string;
+  selected_option_id: string | null;
+  answered_at: string | null;
+}
+
+interface RawSaveAnswerRow {
   selected_option_id: string | null;
   answered_at: string | null;
 }
@@ -242,5 +252,125 @@ export async function getActiveAttemptForStudent(input: {
   };
 }
 
-export { StudentAccessError };
+export async function saveAttemptAnswerForStudent(input: {
+  attemptId: string;
+  studentId: string;
+  simulatorVersionQuestionId: string;
+  selectedOptionId: string | null;
+}): Promise<SaveAttemptAnswerResponse> {
+  const supabase = await createClient();
+  const { data: attemptRow, error: attemptError } = await supabase
+    .from("attempts")
+    .select("id, student_id, status, expires_at")
+    .eq("id", input.attemptId)
+    .maybeSingle();
 
+  if (attemptError) {
+    throw new Error(attemptError.message);
+  }
+
+  if (!attemptRow || attemptRow.student_id !== input.studentId) {
+    throw new StudentAttemptError("attempt_not_found", "Attempt was not found.");
+  }
+
+  if (attemptRow.status !== "active") {
+    throw new StudentAttemptError(
+      "attempt_not_active",
+      "Attempt is no longer active.",
+    );
+  }
+
+  if (Date.parse(attemptRow.expires_at) <= Date.now()) {
+    const { error: expireError } = await supabase
+      .from("attempts")
+      .update({
+        status: "expired",
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", input.attemptId)
+      .eq("status", "active");
+
+    if (expireError) {
+      throw new Error(expireError.message);
+    }
+
+    throw new StudentAttemptError(
+      "attempt_not_active",
+      "Attempt is no longer active.",
+    );
+  }
+
+  const { data: answerRow, error: answerError } = await supabase
+    .from("attempt_answers")
+    .select("attempt_id")
+    .eq("attempt_id", input.attemptId)
+    .eq("simulator_version_question_id", input.simulatorVersionQuestionId)
+    .maybeSingle();
+
+  if (answerError) {
+    throw new Error(answerError.message);
+  }
+
+  if (!answerRow) {
+    throw new StudentAttemptError(
+      "answer_not_found",
+      "Question does not belong to this attempt.",
+    );
+  }
+
+  if (input.selectedOptionId) {
+    const { data: optionRow, error: optionError } = await supabase
+      .from("simulator_version_question_options")
+      .select("id")
+      .eq("id", input.selectedOptionId)
+      .eq("simulator_version_question_id", input.simulatorVersionQuestionId)
+      .maybeSingle();
+
+    if (optionError) {
+      throw new Error(optionError.message);
+    }
+
+    if (!optionRow) {
+      throw new StudentAttemptError(
+        "option_not_found",
+        "Option does not belong to the specified question.",
+      );
+    }
+  }
+
+  const updatePayload = {
+    selected_option_id: input.selectedOptionId,
+    answered_at: input.selectedOptionId ? new Date().toISOString() : null,
+  };
+
+  const { data: updatedAnswer, error: updateError } = await supabase
+    .from("attempt_answers")
+    .update(updatePayload)
+    .eq("attempt_id", input.attemptId)
+    .eq("simulator_version_question_id", input.simulatorVersionQuestionId)
+    .select("selected_option_id, answered_at")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const parsed = updatedAnswer as RawSaveAnswerRow | null;
+  if (
+    !parsed ||
+    (parsed.selected_option_id !== null &&
+      typeof parsed.selected_option_id !== "string") ||
+    (parsed.answered_at !== null && typeof parsed.answered_at !== "string")
+  ) {
+    throw new Error("Invalid attempt answer payload returned from database.");
+  }
+
+  return {
+    attemptId: input.attemptId,
+    simulatorVersionQuestionId: input.simulatorVersionQuestionId,
+    selectedOptionId: parsed.selected_option_id,
+    answeredAt: parsed.answered_at,
+  };
+}
+
+export { StudentAccessError };

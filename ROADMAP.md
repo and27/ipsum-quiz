@@ -53,7 +53,7 @@ Goal: Rendir simulador de punta a punta con temporizador y resultados.
 - [x] V1-F3-002: Rate limit de codigo de acceso
 - [x] V1-F3-003: Inicio de intento transaccional
 - [x] V1-F3-004: Reanudacion de intento activo
-- [ ] V1-F3-005: Guardar respuesta unica y limpiar respuesta
+- [x] V1-F3-005: Guardar respuesta unica y limpiar respuesta
 - [ ] V1-F3-006: UI de examen con navegacion solo adelante
 - [ ] V1-F3-007: Finalizacion manual y calculo de resultados
 - [ ] V1-F3-008: Expiracion automatica por tiempo
