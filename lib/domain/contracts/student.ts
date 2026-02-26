@@ -66,6 +66,7 @@ export interface StudentExamQuestion {
 export interface StudentExamStateResponse {
   attemptId: UUID;
   simulatorId: UUID;
+  simulatorTitle: string;
   simulatorVersionId: UUID;
   status: "active";
   startedAt: ISODateTimeString;

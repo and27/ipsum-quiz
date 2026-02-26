@@ -21,6 +21,13 @@ function formatRemainingTime(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatPercent(score: number, total: number): string {
+  if (total <= 0) {
+    return "0%";
+  }
+  return `${Math.round((score / total) * 100)}%`;
+}
+
 async function parseApiResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T | ApiErrorResponse;
   if (!response.ok) {
@@ -160,16 +167,25 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   }
 
   if (finishResult) {
+    const scorePercent = formatPercent(
+      finishResult.scoreTotal,
+      finishResult.questionsTotal,
+    );
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Resultado</CardTitle>
+          <CardTitle className="text-center text-2xl">Resultado final</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            Puntaje: {finishResult.scoreTotal}/{finishResult.questionsTotal}
-          </p>
+        <CardContent className="space-y-6">
+          <div className="rounded-lg border bg-primary/5 p-6 text-center">
+            <p className="text-sm text-muted-foreground">Tu puntaje</p>
+            <p className="mt-1 text-4xl font-bold">
+              {finishResult.scoreTotal}/{finishResult.questionsTotal}
+            </p>
+            <p className="mt-2 text-xl font-semibold text-primary">{scorePercent}</p>
+          </div>
           <div className="space-y-1">
+            <p className="text-sm font-medium">Desglose por tema</p>
             {finishResult.topicScores.map((topic) => (
               <p
                 key={topic.topicName}
@@ -181,6 +197,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
           </div>
           <Button
             type="button"
+            className="w-full"
             onClick={() =>
               (window.location.href = "/protected/student/simulators")
             }

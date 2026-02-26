@@ -806,6 +806,18 @@ export async function getAttemptExamStateForStudent(input: {
     throw new StudentAttemptError("attempt_expired", "Attempt has expired.");
   }
 
+  const { data: simulatorRow, error: simulatorError } = await supabase
+    .from("simulators")
+    .select("id, title")
+    .eq("id", attemptRow.simulator_id)
+    .maybeSingle();
+  if (simulatorError) {
+    throw new Error(simulatorError.message);
+  }
+  if (!simulatorRow || typeof simulatorRow.title !== "string") {
+    throw new StudentAttemptError("attempt_not_found", "Simulator was not found.");
+  }
+
   const { data: questionRows, error: questionsError } = await supabase
     .from("simulator_version_questions")
     .select(
@@ -855,6 +867,7 @@ export async function getAttemptExamStateForStudent(input: {
   return {
     attemptId: attemptRow.id,
     simulatorId: attemptRow.simulator_id,
+    simulatorTitle: simulatorRow.title,
     simulatorVersionId: attemptRow.simulator_version_id,
     status: "active",
     startedAt: attemptRow.started_at,
