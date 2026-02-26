@@ -1,5 +1,8 @@
 import type {
   SaveAttemptAnswerResponse,
+  StudentExamQuestion,
+  StudentExamQuestionOption,
+  StudentExamStateResponse,
   StartAttemptResponse,
   StudentActiveAttemptAnswer,
   StudentActiveAttemptResponse,
@@ -18,7 +21,8 @@ export type StudentAttemptErrorCode =
   | "attempt_not_found"
   | "attempt_not_active"
   | "answer_not_found"
-  | "option_not_found";
+  | "option_not_found"
+  | "attempt_expired";
 
 export class StudentAttemptError extends Error {
   readonly code: StudentAttemptErrorCode;
@@ -57,6 +61,23 @@ interface RawAnswerRow {
 interface RawSaveAnswerRow {
   selected_option_id: string | null;
   answered_at: string | null;
+}
+
+interface RawExamQuestionOptionRow {
+  id?: unknown;
+  position?: unknown;
+  text?: unknown;
+  image_url?: unknown;
+}
+
+interface RawExamQuestionRow {
+  id?: unknown;
+  position?: unknown;
+  topic_id?: unknown;
+  statement?: unknown;
+  image_url?: unknown;
+  topics?: { name?: unknown } | Array<{ name?: unknown }> | null;
+  simulator_version_question_options?: RawExamQuestionOptionRow[] | null;
 }
 
 function parseStartOrResumeRow(row: unknown): StartAttemptResponse | null {
@@ -118,6 +139,65 @@ function parseAnswerRows(rows: unknown[]): StudentActiveAttemptAnswer[] {
       selectedOptionId: row.selected_option_id,
       answeredAt: row.answered_at,
     }));
+}
+
+function extractTopicName(
+  topics: RawExamQuestionRow["topics"],
+  fallbackTopicId: string,
+): string {
+  if (!topics) {
+    return fallbackTopicId;
+  }
+  if (Array.isArray(topics)) {
+    const candidate = topics[0]?.name;
+    return typeof candidate === "string" ? candidate : fallbackTopicId;
+  }
+  return typeof topics.name === "string" ? topics.name : fallbackTopicId;
+}
+
+function parseExamOptionRow(row: RawExamQuestionOptionRow): StudentExamQuestionOption | null {
+  if (
+    typeof row.id !== "string" ||
+    typeof row.position !== "number" ||
+    typeof row.text !== "string" ||
+    (row.image_url !== null && typeof row.image_url !== "string")
+  ) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    position: row.position,
+    text: row.text,
+    imageUrl: row.image_url,
+  };
+}
+
+function parseExamQuestionRows(rows: unknown[]): StudentExamQuestion[] {
+  return rows
+    .map((row) => row as RawExamQuestionRow)
+    .filter(
+      (row) =>
+        typeof row.id === "string" &&
+        typeof row.position === "number" &&
+        typeof row.topic_id === "string" &&
+        typeof row.statement === "string" &&
+        (row.image_url === null || typeof row.image_url === "string"),
+    )
+    .map((row) => ({
+      id: row.id as string,
+      position: row.position as number,
+      topicId: row.topic_id as string,
+      topicName: extractTopicName(row.topics, row.topic_id as string),
+      statement: row.statement as string,
+      imageUrl: row.image_url as string | null,
+      selectedOptionId: null,
+      options: (row.simulator_version_question_options ?? [])
+        .map((option) => parseExamOptionRow(option))
+        .filter((option): option is StudentExamQuestionOption => !!option)
+        .sort((a, b) => a.position - b.position),
+    }))
+    .sort((a, b) => a.position - b.position);
 }
 
 function mapStartRpcError(errorMessage: string): StudentAttemptError {
@@ -370,6 +450,103 @@ export async function saveAttemptAnswerForStudent(input: {
     simulatorVersionQuestionId: input.simulatorVersionQuestionId,
     selectedOptionId: parsed.selected_option_id,
     answeredAt: parsed.answered_at,
+  };
+}
+
+export async function getAttemptExamStateForStudent(input: {
+  attemptId: string;
+  studentId: string;
+}): Promise<StudentExamStateResponse> {
+  const supabase = await createClient();
+  const { data: attemptRow, error: attemptError } = await supabase
+    .from("attempts")
+    .select(
+      "id, simulator_id, simulator_version_id, status, started_at, expires_at, questions_total, student_id",
+    )
+    .eq("id", input.attemptId)
+    .maybeSingle();
+
+  if (attemptError) {
+    throw new Error(attemptError.message);
+  }
+  if (!attemptRow || attemptRow.student_id !== input.studentId) {
+    throw new StudentAttemptError("attempt_not_found", "Attempt was not found.");
+  }
+  if (attemptRow.status !== "active") {
+    throw new StudentAttemptError("attempt_not_active", "Attempt is no longer active.");
+  }
+
+  if (Date.parse(attemptRow.expires_at) <= Date.now()) {
+    const { error: expireError } = await supabase
+      .from("attempts")
+      .update({
+        status: "expired",
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", attemptRow.id)
+      .eq("status", "active");
+    if (expireError) {
+      throw new Error(expireError.message);
+    }
+    throw new StudentAttemptError("attempt_expired", "Attempt has expired.");
+  }
+
+  const { data: questionRows, error: questionsError } = await supabase
+    .from("simulator_version_questions")
+    .select(
+      "id, position, topic_id, statement, image_url, topics(name), simulator_version_question_options(id, position, text, image_url)",
+    )
+    .eq("simulator_version_id", attemptRow.simulator_version_id)
+    .order("position", { ascending: true });
+  if (questionsError) {
+    throw new Error(questionsError.message);
+  }
+
+  const questions = parseExamQuestionRows((questionRows ?? []) as unknown[]);
+
+  const { data: answerRows, error: answersError } = await supabase
+    .from("attempt_answers")
+    .select("simulator_version_question_id, selected_option_id")
+    .eq("attempt_id", attemptRow.id);
+  if (answersError) {
+    throw new Error(answersError.message);
+  }
+
+  const selectedByQuestionId = new Map<string, string | null>();
+  for (const row of answerRows ?? []) {
+    if (
+      typeof row.simulator_version_question_id === "string" &&
+      (row.selected_option_id === null || typeof row.selected_option_id === "string")
+    ) {
+      selectedByQuestionId.set(
+        row.simulator_version_question_id,
+        row.selected_option_id,
+      );
+    }
+  }
+
+  const mergedQuestions = questions.map((question) => ({
+    ...question,
+    selectedOptionId: selectedByQuestionId.get(question.id) ?? null,
+  }));
+  const firstUnansweredIndex = mergedQuestions.findIndex(
+    (question) => question.selectedOptionId === null,
+  );
+  const currentQuestionIndex =
+    firstUnansweredIndex >= 0
+      ? firstUnansweredIndex
+      : Math.max(mergedQuestions.length - 1, 0);
+
+  return {
+    attemptId: attemptRow.id,
+    simulatorId: attemptRow.simulator_id,
+    simulatorVersionId: attemptRow.simulator_version_id,
+    status: "active",
+    startedAt: attemptRow.started_at,
+    expiresAt: attemptRow.expires_at,
+    questionsTotal: attemptRow.questions_total,
+    currentQuestionIndex,
+    questions: mergedQuestions,
   };
 }
 

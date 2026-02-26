@@ -44,6 +44,36 @@ export interface StudentActiveAttemptResponse {
   answers: StudentActiveAttemptAnswer[];
 }
 
+export interface StudentExamQuestionOption {
+  id: UUID;
+  position: number;
+  text: string;
+  imageUrl: string | null;
+}
+
+export interface StudentExamQuestion {
+  id: UUID;
+  position: number;
+  topicId: UUID;
+  topicName: string;
+  statement: string;
+  imageUrl: string | null;
+  selectedOptionId: UUID | null;
+  options: StudentExamQuestionOption[];
+}
+
+export interface StudentExamStateResponse {
+  attemptId: UUID;
+  simulatorId: UUID;
+  simulatorVersionId: UUID;
+  status: "active";
+  startedAt: ISODateTimeString;
+  expiresAt: ISODateTimeString;
+  questionsTotal: number;
+  currentQuestionIndex: number;
+  questions: StudentExamQuestion[];
+}
+
 export interface SaveAttemptAnswerRequest {
   attemptId: UUID;
   simulatorVersionQuestionId: UUID;

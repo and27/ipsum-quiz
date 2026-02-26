@@ -1,4 +1,5 @@
 export {
+  getAttemptExamStateForStudent,
   getActiveAttemptForStudent,
   saveAttemptAnswerForStudent,
   startOrResumeAttemptForStudent,
