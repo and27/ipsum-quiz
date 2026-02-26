@@ -37,8 +37,8 @@ export default async function ProtectedLayout({
         </nav>
 
         <div className="mx-auto flex w-full max-w-6xl flex-1 gap-5 p-5">
+          {isAdmin ? <AdminSidebar /> : null}
           <div className="flex min-w-0 flex-1 flex-col gap-6">
-            {isAdmin ? <AdminSidebar /> : null}
             {children}
           </div>
         </div>
