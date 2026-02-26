@@ -27,6 +27,23 @@ export interface StartAttemptResponse {
   simulatorVersionId: UUID;
 }
 
+export interface StudentActiveAttemptAnswer {
+  simulatorVersionQuestionId: UUID;
+  selectedOptionId: UUID | null;
+  answeredAt: ISODateTimeString | null;
+}
+
+export interface StudentActiveAttemptResponse {
+  attemptId: UUID;
+  simulatorId: UUID;
+  simulatorVersionId: UUID;
+  status: "active";
+  startedAt: ISODateTimeString;
+  expiresAt: ISODateTimeString;
+  questionsTotal: number;
+  answers: StudentActiveAttemptAnswer[];
+}
+
 export interface SaveAttemptAnswerRequest {
   attemptId: UUID;
   simulatorVersionQuestionId: UUID;
