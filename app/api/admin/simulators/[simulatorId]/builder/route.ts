@@ -52,9 +52,12 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ simulatorId: string }> },
 ) {
+  let simulatorIdForLog = "";
+  let payloadForLog: AdminSimulatorBuilderAddQuestionRequest | null = null;
   try {
     await requireAdmin();
     const { simulatorId } = await context.params;
+    simulatorIdForLog = simulatorId;
     if (!simulatorId) {
       return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
@@ -68,6 +71,7 @@ export async function POST(
       sourceQuestionId: body.sourceQuestionId,
       position: typeof body.position === "number" ? body.position : undefined,
     };
+    payloadForLog = payload;
 
     const item = await addQuestionToDraftVersion(
       simulatorId,
@@ -97,10 +101,18 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: "No se pudo agregar la pregunta a la version borrador." },
-      { status: 500 },
-    );
+    console.error("[admin/builder:POST] add question failed", {
+      simulatorId: simulatorIdForLog,
+      payload: payloadForLog,
+      error,
+    });
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "No se pudo agregar la pregunta a la version borrador.";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

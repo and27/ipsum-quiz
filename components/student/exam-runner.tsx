@@ -4,7 +4,7 @@ import type { StudentExamStateResponse } from "@/lib/domain/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface StudentExamRunnerProps {
   initialState: StudentExamStateResponse;
@@ -37,11 +37,11 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   const [questions, setQuestions] = useState(initialState.questions);
   const [currentIndex, setCurrentIndex] = useState(initialState.currentQuestionIndex);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     Math.max(0, Math.floor((Date.parse(initialState.expiresAt) - Date.now()) / 1000)),
   );
   const [isFinishing, setIsFinishing] = useState(false);
+  const saveRequestVersionRef = useRef<Record<string, number>>({});
   const [finishResult, setFinishResult] = useState<{
     scoreTotal: number;
     questionsTotal: number;
@@ -64,7 +64,17 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
 
   async function saveAnswer(questionId: string, selectedOptionId: string | null) {
     setErrorMessage(null);
-    setSavingQuestionId(questionId);
+    const previousSelectedOptionId =
+      questions.find((question) => question.id === questionId)?.selectedOptionId ?? null;
+    const requestVersion = (saveRequestVersionRef.current[questionId] ?? 0) + 1;
+    saveRequestVersionRef.current[questionId] = requestVersion;
+
+    // Optimistic UI: reflect selection instantly.
+    setQuestions((prev) =>
+      prev.map((question) =>
+        question.id === questionId ? { ...question, selectedOptionId } : question,
+      ),
+    );
     try {
       await parseApiResponse(
         await fetch(`/api/student/attempts/${initialState.attemptId}/answers`, {
@@ -76,18 +86,19 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
           }),
         }),
       );
-
-      setQuestions((prev) =>
-        prev.map((question) =>
-          question.id === questionId ? { ...question, selectedOptionId } : question,
-        ),
-      );
     } catch (error: unknown) {
+      if (saveRequestVersionRef.current[questionId] === requestVersion) {
+        setQuestions((prev) =>
+          prev.map((question) =>
+            question.id === questionId
+              ? { ...question, selectedOptionId: previousSelectedOptionId }
+              : question,
+          ),
+        );
+      }
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudo guardar la respuesta.",
       );
-    } finally {
-      setSavingQuestionId(null);
     }
   }
 
@@ -183,7 +194,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                       : "border-border hover:border-primary/50"
                   }`}
                   onClick={() => saveAnswer(currentQuestion.id, option.id)}
-                  disabled={isExpired || savingQuestionId === currentQuestion.id}
+                  disabled={isExpired}
                 >
                   {option.position}. {option.text}
                 </button>
@@ -197,7 +208,6 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
               onClick={() => saveAnswer(currentQuestion.id, null)}
               disabled={
                 isExpired ||
-                savingQuestionId === currentQuestion.id ||
                 currentQuestion.selectedOptionId === null
               }
             >

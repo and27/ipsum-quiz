@@ -24,6 +24,24 @@ interface ApiErrorResponse {
   error?: string;
 }
 
+function getUnknownErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === "string" && error) {
+    return error;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return fallback;
+}
+
 async function parseApiResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T | ApiErrorResponse;
   if (!response.ok) {
@@ -148,9 +166,10 @@ export function SimulatorVersionBuilderManager({
         await loadState();
       }
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo agregar la pregunta a la version borrador.",
+        getUnknownErrorMessage(
+          error,
+          "No se pudo agregar la pregunta a la version borrador.",
+        ),
       );
     } finally {
       setIsAdding(false);

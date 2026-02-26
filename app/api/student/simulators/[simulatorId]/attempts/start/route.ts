@@ -16,9 +16,14 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ simulatorId: string }> },
 ) {
+  let simulatorIdForLog = "";
+  let studentIdForLog = "";
+  let hasAccessCodeForLog = false;
   try {
     const session = await requireStudent();
+    studentIdForLog = session.userId;
     const { simulatorId } = await context.params;
+    simulatorIdForLog = simulatorId;
     if (!simulatorId) {
       return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
@@ -30,6 +35,7 @@ export async function POST(
 
     const accessCode =
       typeof body.accessCode === "string" ? body.accessCode : undefined;
+    hasAccessCodeForLog = typeof accessCode === "string" && accessCode.length > 0;
 
     const result = await startOrResumeAttemptForStudent({
       simulatorId,
@@ -76,7 +82,16 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "No se pudo iniciar el intento." }, { status: 500 });
+    console.error("[student/attempts/start:POST] unexpected error", {
+      simulatorId: simulatorIdForLog,
+      studentId: studentIdForLog,
+      hasAccessCode: hasAccessCodeForLog,
+      error,
+    });
+
+    const message =
+      error instanceof Error ? error.message : "No se pudo iniciar el intento.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

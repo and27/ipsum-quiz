@@ -347,7 +347,7 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("simulator_version_questions")
-    .select("id")
+    .select("id, position")
     .eq("simulator_version_id", versionId)
     .order("position", { ascending: true });
 
@@ -355,11 +355,15 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
     throw new Error(error.message);
   }
 
-  const rows = (data ?? []) as Array<{ id: string }>;
+  const rows = (data ?? []) as Array<{ id: string; position: number }>;
+  const maxPosition = rows.reduce(
+    (max, row) => (row.position > max ? row.position : max),
+    0,
+  );
   for (let index = 0; index < rows.length; index += 1) {
     const { error: tempError } = await supabase
       .from("simulator_version_questions")
-      .update({ position: -(index + 1) })
+      .update({ position: maxPosition + index + 1 })
       .eq("simulator_version_id", versionId)
       .eq("id", rows[index].id);
     if (tempError) {
@@ -381,10 +385,24 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
 
 async function reorderByIds(versionId: string, orderedIds: string[]): Promise<void> {
   const supabase = await createClient();
+  const { data: rows, error: rowsError } = await supabase
+    .from("simulator_version_questions")
+    .select("id, position")
+    .eq("simulator_version_id", versionId);
+
+  if (rowsError) {
+    throw new Error(rowsError.message);
+  }
+
+  const maxPosition = (rows ?? []).reduce(
+    (max, row) => (row.position > max ? row.position : max),
+    0,
+  );
+
   for (let index = 0; index < orderedIds.length; index += 1) {
     const { error: tempError } = await supabase
       .from("simulator_version_questions")
-      .update({ position: -(index + 1) })
+      .update({ position: maxPosition + index + 1 })
       .eq("simulator_version_id", versionId)
       .eq("id", orderedIds[index]);
     if (tempError) {
@@ -544,6 +562,12 @@ export async function addQuestionToDraftVersion(
   const source = await assertSourceQuestionEligible(sourceQuestionId);
 
   const supabase = await createClient();
+  const logContext = {
+    simulatorId,
+    editableVersionId: editableVersion.id,
+    sourceQuestionId,
+    requestedPosition,
+  };
 
   const { data: duplicate, error: duplicateError } = await supabase
     .from("simulator_version_questions")
@@ -553,6 +577,10 @@ export async function addQuestionToDraftVersion(
     .maybeSingle();
 
   if (duplicateError) {
+    console.error("[simulator-builder:add-question] duplicate check failed", {
+      ...logContext,
+      duplicateError,
+    });
     throw new Error(duplicateError.message);
   }
 
@@ -572,6 +600,10 @@ export async function addQuestionToDraftVersion(
     .maybeSingle();
 
   if (maxPositionError) {
+    console.error("[simulator-builder:add-question] max position query failed", {
+      ...logContext,
+      maxPositionError,
+    });
     throw new Error(maxPositionError.message);
   }
 
@@ -594,6 +626,16 @@ export async function addQuestionToDraftVersion(
     .single();
 
   if (createError) {
+    console.error("[simulator-builder:add-question] create version question failed", {
+      ...logContext,
+      createError,
+      insertPayload: {
+        simulator_version_id: editableVersion.id,
+        position: nextPosition,
+        topic_id: source.topicId,
+        source_question_id: sourceQuestionId,
+      },
+    });
     throw new Error(createError.message);
   }
 
@@ -607,6 +649,10 @@ export async function addQuestionToDraftVersion(
     .order("position", { ascending: true });
 
   if (sourceOptionsError) {
+    console.error("[simulator-builder:add-question] source options query failed", {
+      ...logContext,
+      sourceOptionsError,
+    });
     throw new Error(sourceOptionsError.message);
   }
 
@@ -624,6 +670,12 @@ export async function addQuestionToDraftVersion(
       .insert(optionRows);
 
     if (insertOptionsError) {
+      console.error("[simulator-builder:add-question] copy options failed", {
+        ...logContext,
+        versionQuestionId,
+        optionsCount: optionRows.length,
+        insertOptionsError,
+      });
       throw new Error(insertOptionsError.message);
     }
   }
@@ -653,6 +705,11 @@ export async function addQuestionToDraftVersion(
   const finalItems = await listVersionQuestions(editableVersion.id);
   const created = finalItems.find((item) => item.id === versionQuestionId);
   if (!created) {
+    console.error("[simulator-builder:add-question] created question not found after insert", {
+      ...logContext,
+      versionQuestionId,
+      finalItemsCount: finalItems.length,
+    });
     throw new Error("No se pudo cargar la pregunta creada en la version.");
   }
 
@@ -703,6 +760,11 @@ export async function removeQuestionFromDraftVersion(
   await getSimulatorById(simulatorId);
   const editableVersion = await getEditableVersionForMutations(simulatorId);
   const supabase = await createClient();
+  const logContext = {
+    simulatorId,
+    editableVersionId: editableVersion.id,
+    versionQuestionId,
+  };
 
   const { data: deletedRow, error: deleteError } = await supabase
     .from("simulator_version_questions")
@@ -713,13 +775,25 @@ export async function removeQuestionFromDraftVersion(
     .maybeSingle();
 
   if (deleteError) {
+    console.error("[simulator-builder:remove-question] delete failed", {
+      ...logContext,
+      deleteError,
+    });
     throw new Error(deleteError.message);
   }
   if (!deletedRow) {
     throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
   }
 
-  await normalizeVersionQuestionPositions(editableVersion.id);
+  try {
+    await normalizeVersionQuestionPositions(editableVersion.id);
+  } catch (error) {
+    console.error("[simulator-builder:remove-question] normalize positions failed", {
+      ...logContext,
+      error,
+    });
+    throw error;
+  }
 }
 
 function validateOrderContiguous(

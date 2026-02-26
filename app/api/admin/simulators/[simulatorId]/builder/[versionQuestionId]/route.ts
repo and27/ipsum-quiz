@@ -64,9 +64,13 @@ export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<{ simulatorId: string; versionQuestionId: string }> },
 ) {
+  let simulatorIdForLog = "";
+  let versionQuestionIdForLog = "";
   try {
     await requireAdmin();
     const { simulatorId, versionQuestionId } = await context.params;
+    simulatorIdForLog = simulatorId;
+    versionQuestionIdForLog = versionQuestionId;
     if (!simulatorId || !versionQuestionId) {
       return NextResponse.json({ error: "Parametros de ruta invalidos." }, { status: 400 });
     }
@@ -89,10 +93,16 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: "No se pudo quitar la pregunta del borrador." },
-      { status: 500 },
-    );
+    console.error("[admin/builder:DELETE] remove question failed", {
+      simulatorId: simulatorIdForLog,
+      versionQuestionId: versionQuestionIdForLog,
+      error,
+    });
+    const message =
+      error instanceof Error
+        ? error.message
+        : "No se pudo quitar la pregunta del borrador.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

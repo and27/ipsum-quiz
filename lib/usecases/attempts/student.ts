@@ -292,29 +292,99 @@ function parsePageSize(value?: number): number {
   return Math.max(1, Math.min(100, Math.trunc(value)));
 }
 
-function mapStartRpcError(errorMessage: string): StudentAttemptError {
+function describeDbError(error: unknown): string {
+  const message =
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : "UNKNOWN_DB_ERROR";
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined;
+  const details =
+    typeof error === "object" &&
+    error !== null &&
+    "details" in error &&
+    typeof (error as { details?: unknown }).details === "string"
+      ? (error as { details: string }).details
+      : undefined;
+  const hint =
+    typeof error === "object" &&
+    error !== null &&
+    "hint" in error &&
+    typeof (error as { hint?: unknown }).hint === "string"
+      ? (error as { hint: string }).hint
+      : undefined;
+
+  return [message, code, details, hint]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" | ");
+}
+
+function mapStartRpcError(error: unknown): StudentAttemptError {
+  const errorMessage =
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : "UNKNOWN";
+  const errorCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined;
+  const errorDetails =
+    typeof error === "object" &&
+    error !== null &&
+    "details" in error &&
+    typeof (error as { details?: unknown }).details === "string"
+      ? (error as { details: string }).details
+      : undefined;
+  const errorHint =
+    typeof error === "object" &&
+    error !== null &&
+    "hint" in error &&
+    typeof (error as { hint?: unknown }).hint === "string"
+      ? (error as { hint: string }).hint
+      : undefined;
+
   if (errorMessage.includes("SIMULATOR_NOT_AVAILABLE")) {
     return new StudentAttemptError(
       "simulator_not_available",
-      "Simulator is not currently available.",
+      "El simulador no esta disponible actualmente.",
     );
   }
   if (errorMessage.includes("MAX_ATTEMPTS_REACHED")) {
     return new StudentAttemptError(
       "max_attempts_reached",
-      "You already used the maximum number of attempts for this simulator.",
+      "Ya usaste el maximo de intentos para este simulador.",
     );
   }
   if (errorMessage.includes("VERSION_HAS_NO_QUESTIONS")) {
     return new StudentAttemptError(
       "version_has_no_questions",
-      "This simulator version has no questions available.",
+      "La version publicada no tiene preguntas disponibles.",
     );
   }
 
+  const diagnostics = [errorMessage, errorCode, errorDetails, errorHint]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" | ");
+
   return new StudentAttemptError(
     "simulator_not_available",
-    "Failed to start attempt.",
+    diagnostics
+      ? `No se pudo iniciar el intento. ${diagnostics}`
+      : "No se pudo iniciar el intento.",
   );
 }
 
@@ -330,7 +400,11 @@ async function calculateAndPersistAttemptScores(
   );
 
   if (scoreError) {
-    throw new Error(scoreError.message);
+    console.error("[attempts:finish] get_attempt_score_rows failed", {
+      attemptId,
+      scoreError,
+    });
+    throw new Error(describeDbError(scoreError));
   }
 
   const rows = (scoreRows ?? []) as RawScoreRow[];
@@ -380,7 +454,11 @@ async function calculateAndPersistAttemptScores(
     .delete()
     .eq("attempt_id", attemptId);
   if (deleteTopicScoresError) {
-    throw new Error(deleteTopicScoresError.message);
+    console.error("[attempts:finish] delete attempt_topic_scores failed", {
+      attemptId,
+      deleteTopicScoresError,
+    });
+    throw new Error(describeDbError(deleteTopicScoresError));
   }
 
   if (topicScores.length > 0) {
@@ -395,7 +473,11 @@ async function calculateAndPersistAttemptScores(
         })),
       );
     if (insertTopicScoresError) {
-      throw new Error(insertTopicScoresError.message);
+      console.error("[attempts:finish] insert attempt_topic_scores failed", {
+        attemptId,
+        insertTopicScoresError,
+      });
+      throw new Error(describeDbError(insertTopicScoresError));
     }
   }
 
@@ -406,7 +488,11 @@ async function calculateAndPersistAttemptScores(
     },
   );
   if (updateAnswersError) {
-    throw new Error(updateAnswersError.message);
+    console.error("[attempts:finish] set_attempt_answers_correctness failed", {
+      attemptId,
+      updateAnswersError,
+    });
+    throw new Error(describeDbError(updateAnswersError));
   }
 
   return {
@@ -478,6 +564,13 @@ export async function startOrResumeAttemptForStudent(input: {
   ipAddress: string;
   accessCode?: string;
 }): Promise<StartAttemptResponse> {
+  const logContext = {
+    simulatorId: input.simulatorId,
+    studentId: input.studentId,
+    hasAccessCode: typeof input.accessCode === "string" && input.accessCode.length > 0,
+    ipAddress: input.ipAddress,
+  };
+
   await verifySimulatorAccessCodeForStudent({
     simulatorId: input.simulatorId,
     studentId: input.studentId,
@@ -491,15 +584,23 @@ export async function startOrResumeAttemptForStudent(input: {
   });
 
   if (error) {
-    throw mapStartRpcError(error.message);
+    console.error("[attempts:start-or-resume] rpc failed", {
+      ...logContext,
+      rpcError: error,
+    });
+    throw mapStartRpcError(error);
   }
 
   const row = Array.isArray(data) ? data[0] : null;
   const parsed = parseStartOrResumeRow(row);
   if (!parsed) {
+    console.error("[attempts:start-or-resume] invalid rpc payload", {
+      ...logContext,
+      rpcData: data,
+    });
     throw new StudentAttemptError(
       "simulator_not_available",
-      "Invalid attempt payload returned from database.",
+      "Respuesta invalida al iniciar intento desde la base de datos.",
     );
   }
 
@@ -769,6 +870,7 @@ export async function finishAttemptForStudent(input: {
   studentId: string;
 }): Promise<FinishAttemptResponse> {
   const supabase = await createClient();
+  const logContext = { attemptId: input.attemptId, studentId: input.studentId };
   const { data: attemptRow, error: attemptError } = await supabase
     .from("attempts")
     .select("id, student_id, status, questions_total")
@@ -776,7 +878,11 @@ export async function finishAttemptForStudent(input: {
     .maybeSingle();
 
   if (attemptError) {
-    throw new Error(attemptError.message);
+    console.error("[attempts:finish] load attempt failed", {
+      ...logContext,
+      attemptError,
+    });
+    throw new Error(describeDbError(attemptError));
   }
   if (!attemptRow || attemptRow.student_id !== input.studentId) {
     throw new StudentAttemptError("attempt_not_found", "Attempt was not found.");

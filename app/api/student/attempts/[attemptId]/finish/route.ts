@@ -10,9 +10,13 @@ export async function POST(
   _request: NextRequest,
   context: { params: Promise<{ attemptId: string }> },
 ) {
+  let attemptIdForLog = "";
+  let studentIdForLog = "";
   try {
     const session = await requireStudent();
+    studentIdForLog = session.userId;
     const { attemptId } = await context.params;
+    attemptIdForLog = attemptId;
     if (!attemptId) {
       return NextResponse.json({ error: "ID de intento invalido." }, { status: 400 });
     }
@@ -43,10 +47,14 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: "No se pudo finalizar el intento." },
-      { status: 500 },
-    );
+    console.error("[student/attempts/finish:POST] unexpected error", {
+      attemptId: attemptIdForLog,
+      studentId: studentIdForLog,
+      error,
+    });
+    const message =
+      error instanceof Error ? error.message : "No se pudo finalizar el intento.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
