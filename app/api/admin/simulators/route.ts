@@ -38,6 +38,14 @@ export async function GET(request: NextRequest) {
     };
 
     const result = await listSimulators(query);
+    console.info("[api/admin/simulators:GET] response sample", {
+      count: result.items.length,
+      sample: result.items.slice(0, 3).map((item) => ({
+        id: item.id,
+        hasAccessCode: item.hasAccessCode,
+        accessCode: item.accessCode ?? null,
+      })),
+    });
     return NextResponse.json({
       items: result.items,
       meta: {
@@ -91,6 +99,11 @@ export async function POST(request: NextRequest) {
     const simulator = await createSimulator({
       ...payload,
       createdBy: session.userId,
+    });
+    console.info("[api/admin/simulators:POST] created", {
+      id: simulator.id,
+      hasAccessCode: simulator.hasAccessCode,
+      accessCode: simulator.accessCode ?? null,
     });
 
     return NextResponse.json({ simulator }, { status: 201 });

@@ -36,6 +36,7 @@ interface RawSimulatorRow {
   title: string;
   description: string | null;
   access_code_hash: string | null;
+  access_code_plaintext?: string | null;
   max_attempts: number;
   duration_minutes: number;
   is_active: boolean;
@@ -93,6 +94,9 @@ function parseSimulatorRow(row: unknown): Simulator | null {
     typeof row.title !== "string" ||
     (row.description !== null && typeof row.description !== "string") ||
     (row.access_code_hash !== null && typeof row.access_code_hash !== "string") ||
+    (typeof row.access_code_plaintext !== "undefined" &&
+      row.access_code_plaintext !== null &&
+      typeof row.access_code_plaintext !== "string") ||
     typeof row.max_attempts !== "number" ||
     typeof row.duration_minutes !== "number" ||
     typeof row.is_active !== "boolean" ||
@@ -110,6 +114,8 @@ function parseSimulatorRow(row: unknown): Simulator | null {
     id: row.id,
     title: row.title,
     description: row.description,
+    accessCode:
+      typeof row.access_code_plaintext === "string" ? row.access_code_plaintext : null,
     maxAttempts: row.max_attempts,
     durationMinutes: row.duration_minutes,
     isActive: row.is_active,
@@ -306,7 +312,7 @@ export async function listSimulators(
   let dbQuery = supabase
     .from("simulators")
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
       { count: "exact" },
     )
     .order("updated_at", { ascending: false })
@@ -318,13 +324,30 @@ export async function listSimulators(
 
   const { data, error, count } = await dbQuery;
   if (error) {
+    console.error("[admin/simulators:list] query failed", { error });
     throw new Error(error.message);
   }
 
   const rows = (data ?? []) as RawSimulatorRow[];
+  console.info("[admin/simulators:list] raw rows", {
+    totalRows: rows.length,
+    sample: rows.slice(0, 3).map((row) => ({
+      id: row.id,
+      hasHash: !!row.access_code_hash,
+      plaintext: row.access_code_plaintext ?? null,
+    })),
+  });
   const items = rows
     .map((row) => parseSimulatorRow(row))
     .filter((row): row is Simulator => !!row);
+  console.info("[admin/simulators:list] parsed rows", {
+    totalItems: items.length,
+    sample: items.slice(0, 3).map((item) => ({
+      id: item.id,
+      hasAccessCode: item.hasAccessCode,
+      accessCode: item.accessCode ?? null,
+    })),
+  });
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -361,6 +384,7 @@ export async function createSimulator(
 
   if (accessCode) {
     payload.access_code_hash = hashAccessCode(accessCode);
+    payload.access_code_plaintext = accessCode;
   }
 
   const supabase = await createClient();
@@ -368,16 +392,26 @@ export async function createSimulator(
     .from("simulators")
     .insert(payload)
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .single();
 
   if (error) {
+    console.error("[admin/simulators:create] insert failed", {
+      payload,
+      error,
+    });
     throw new Error(error.message);
   }
 
+  console.info("[admin/simulators:create] inserted row", {
+    id: (data as RawSimulatorRow | null)?.id ?? null,
+    hasHash: !!(data as RawSimulatorRow | null)?.access_code_hash,
+    plaintext: (data as RawSimulatorRow | null)?.access_code_plaintext ?? null,
+  });
   const simulator = parseSimulatorRow(data);
   if (!simulator) {
+    console.error("[admin/simulators:create] parse failed", { data });
     throw new Error("Invalid simulator payload returned from database.");
   }
 
@@ -422,6 +456,7 @@ export async function updateSimulator(
   if ("accessCode" in input) {
     const accessCode = normalizeAccessCode(input.accessCode);
     payload.access_code_hash = accessCode ? hashAccessCode(accessCode) : null;
+    payload.access_code_plaintext = accessCode;
   }
 
   if (Object.keys(payload).length === 0) {
@@ -434,11 +469,16 @@ export async function updateSimulator(
     .update(payload)
     .eq("id", simulatorId)
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .maybeSingle();
 
   if (error) {
+    console.error("[admin/simulators:update] update failed", {
+      simulatorId,
+      payload,
+      error,
+    });
     throw new Error(error.message);
   }
 
@@ -446,11 +486,18 @@ export async function updateSimulator(
     throw new SimulatorInputError("not_found", "Simulator was not found.");
   }
 
+  console.info("[admin/simulators:update] updated row", {
+    simulatorId,
+    hasHash: (data as RawSimulatorRow).access_code_hash
+      ? true
+      : false,
+    plaintext: (data as RawSimulatorRow).access_code_plaintext ?? null,
+  });
   const simulator = parseSimulatorRow(data);
   if (!simulator) {
+    console.error("[admin/simulators:update] parse failed", { simulatorId, data });
     throw new Error("Invalid simulator payload returned from database.");
   }
 
   return simulator;
 }
-

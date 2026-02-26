@@ -60,6 +60,12 @@ function buildEditMaxAttempts(simulators: Simulator[]): Record<string, string> {
   );
 }
 
+function buildEditAccessCode(simulators: Simulator[]): Record<string, string> {
+  return Object.fromEntries(
+    simulators.map((simulator) => [simulator.id, simulator.accessCode ?? ""]),
+  );
+}
+
 export function SimulatorsManager({
   initialSimulators,
 }: SimulatorsManagerProps) {
@@ -91,7 +97,9 @@ export function SimulatorsManager({
   const [editMaxAttempts, setEditMaxAttempts] = useState<Record<string, string>>(
     () => buildEditMaxAttempts(initialSimulators.items),
   );
-  const [editAccessCode, setEditAccessCode] = useState<Record<string, string>>({});
+  const [editAccessCode, setEditAccessCode] = useState<Record<string, string>>(
+    () => buildEditAccessCode(initialSimulators.items),
+  );
 
   const totalLabel = useMemo(() => {
     const active = simulators.filter((simulator) => simulator.isActive).length;
@@ -114,7 +122,7 @@ export function SimulatorsManager({
       setEditDescription(buildEditDescription(payload.items));
       setEditDuration(buildEditDuration(payload.items));
       setEditMaxAttempts(buildEditMaxAttempts(payload.items));
-      setEditAccessCode({});
+      setEditAccessCode(buildEditAccessCode(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudieron cargar los simuladores.",
@@ -176,9 +184,29 @@ export function SimulatorsManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      await parseApiResponse<AdminSimulatorResponse>(response);
+      const parsed = await parseApiResponse<AdminSimulatorResponse>(response);
+      const updatedSimulator = parsed.simulator;
+      setSimulators((prev) =>
+        prev.map((item) => (item.id === updatedSimulator.id ? updatedSimulator : item)),
+      );
+      setEditTitle((prev) => ({ ...prev, [updatedSimulator.id]: updatedSimulator.title }));
+      setEditDescription((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: updatedSimulator.description ?? "",
+      }));
+      setEditDuration((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: String(updatedSimulator.durationMinutes),
+      }));
+      setEditMaxAttempts((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: String(updatedSimulator.maxAttempts),
+      }));
+      setEditAccessCode((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: updatedSimulator.accessCode ?? "",
+      }));
       setSuccessMessage("Simulador actualizado.");
-      await loadSimulators(meta.page, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudo actualizar el simulador.",
@@ -315,13 +343,16 @@ export function SimulatorsManager({
               const maxAttempts =
                 editMaxAttempts[simulator.id] ?? String(simulator.maxAttempts);
               const accessCode = editAccessCode[simulator.id] ?? "";
+              const normalizedAccessCode = accessCode.trim();
+              const currentAccessCode = simulator.accessCode ?? "";
+              const accessCodeChanged = normalizedAccessCode !== currentAccessCode;
 
               const hasChanges =
                 title.trim() !== simulator.title ||
                 (description || null) !== simulator.description ||
                 Number(durationMinutes) !== simulator.durationMinutes ||
                 Number(maxAttempts) !== simulator.maxAttempts ||
-                accessCode.trim().length > 0;
+                accessCodeChanged;
 
               return (
                 <div key={simulator.id} className="space-y-3 rounded-lg border p-3">
@@ -415,7 +446,7 @@ export function SimulatorsManager({
 
                   <Input
                     id={`simulator-access-code-${simulator.id}`}
-                    placeholder="Nuevo codigo de acceso (deja vacio para mantener el actual)"
+                    placeholder="Codigo de acceso (opcional)"
                     value={accessCode}
                     onChange={(event) =>
                       setEditAccessCode((prev) => ({
@@ -448,7 +479,12 @@ export function SimulatorsManager({
                           description: description || null,
                           durationMinutes: Number(durationMinutes),
                           maxAttempts: Number(maxAttempts),
-                          accessCode: accessCode || undefined,
+                          accessCode:
+                            accessCodeChanged
+                              ? normalizedAccessCode.length > 0
+                                ? normalizedAccessCode
+                                : null
+                              : undefined,
                         })
                       }
                     >

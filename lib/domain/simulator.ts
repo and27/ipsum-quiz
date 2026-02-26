@@ -8,6 +8,7 @@ export interface Simulator {
   id: UUID;
   title: string;
   description: string | null;
+  accessCode?: string | null;
   maxAttempts: number;
   durationMinutes: number;
   isActive: boolean;

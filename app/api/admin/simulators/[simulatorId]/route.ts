@@ -11,10 +11,13 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ simulatorId: string }> },
 ) {
+  let simulatorIdForLog = "";
+  let payloadForLog: AdminSimulatorUpdateRequest = {};
   try {
     await requireAdmin();
 
     const { simulatorId } = await context.params;
+    simulatorIdForLog = simulatorId;
     if (!simulatorId) {
       return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
@@ -46,8 +49,15 @@ export async function PATCH(
     if (typeof body.accessCode === "string" || body.accessCode === null) {
       payload.accessCode = body.accessCode;
     }
+    payloadForLog = payload;
 
     const simulator = await updateSimulator(simulatorId, payload);
+    console.info("[api/admin/simulators/:id PATCH] updated", {
+      simulatorId,
+      payload: payloadForLog,
+      hasAccessCode: simulator.hasAccessCode,
+      accessCode: simulator.accessCode ?? null,
+    });
     return NextResponse.json({ simulator });
   } catch (error) {
     const authResponse = mapAuthGuardErrorToResponse(error);
@@ -67,10 +77,14 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: "No se pudo actualizar el simulador." },
-      { status: 500 },
-    );
+    console.error("[api/admin/simulators/:id PATCH] unexpected error", {
+      simulatorId: simulatorIdForLog,
+      payload: payloadForLog,
+      error,
+    });
+    const message =
+      error instanceof Error ? error.message : "No se pudo actualizar el simulador.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
