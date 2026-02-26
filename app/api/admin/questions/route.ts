@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Failed to list questions." },
+      { error: "No se pudieron listar las preguntas." },
       { status: 500 },
     );
   }
@@ -64,12 +64,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuthenticatedUser();
     if (session.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+      return NextResponse.json({ error: "Prohibido." }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminQuestionCreateRequest = {
@@ -106,9 +106,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Failed to create question." },
+      { error: "No se pudo crear la pregunta." },
       { status: 500 },
     );
   }
 }
+
 

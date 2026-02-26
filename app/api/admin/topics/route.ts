@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       return authResponse;
     }
 
-    return NextResponse.json({ error: "Failed to list topics." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudieron listar los temas." }, { status: 500 });
   }
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body) || typeof body.name !== "string") {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminTopicCreateRequest = { name: body.name };
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ error: "Failed to create topic." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo crear el tema." }, { status: 500 });
   }
 }
+

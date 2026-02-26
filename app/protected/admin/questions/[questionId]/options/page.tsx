@@ -40,9 +40,9 @@ async function AdminQuestionOptionsContent({
   return (
     <div className="flex w-full flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin - Question Options</h1>
+        <h1 className="text-2xl font-bold">Admin - Opciones de pregunta</h1>
         <p className="text-sm text-muted-foreground">
-          Configure options for this question.
+          Configura las opciones de esta pregunta.
         </p>
         <p className="mt-2 rounded border p-3 text-sm">
           {questionRow.statement}
@@ -65,7 +65,7 @@ export default function AdminQuestionOptionsPage({
   params: Promise<{ questionId: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <AdminQuestionOptionsContent params={params} />
     </Suspense>
   );

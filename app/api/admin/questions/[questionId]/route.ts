@@ -16,12 +16,12 @@ export async function PATCH(
 
     const { questionId } = await context.params;
     if (!questionId) {
-      return NextResponse.json({ error: "Invalid question id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de pregunta invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminQuestionUpdateRequest = {};
@@ -63,8 +63,9 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Failed to update question." },
+      { error: "No se pudo actualizar la pregunta." },
       { status: 500 },
     );
   }
 }
+

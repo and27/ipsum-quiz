@@ -28,7 +28,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
 
@@ -54,7 +54,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
 
   const topicCountLabel = useMemo(() => {
     const active = topics.filter((topic) => topic.isActive).length;
-    return `${topics.length} topics (${active} active)`;
+    return `${topics.length} temas (${active} activos)`;
   }, [topics]);
 
   async function loadTopics(nextIncludeInactive = includeInactive) {
@@ -73,7 +73,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
       setTopics(payload.items);
       setEditNames(buildEditNames(payload.items));
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load topics.");
+      setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los temas.");
     } finally {
       setIsLoadingList(false);
     }
@@ -96,10 +96,10 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
       });
       await parseApiResponse<AdminTopicResponse>(response);
       setNewTopicName("");
-      setSuccessMessage("Topic created.");
+      setSuccessMessage("Tema creado.");
       await loadTopics(includeInactive);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create topic.");
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo crear el tema.");
     } finally {
       setIsCreating(false);
     }
@@ -119,10 +119,10 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
         body: JSON.stringify(payload),
       });
       await parseApiResponse<AdminTopicResponse>(response);
-      setSuccessMessage("Topic updated.");
+      setSuccessMessage("Tema actualizado.");
       await loadTopics(includeInactive);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update topic.");
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar el tema.");
     } finally {
       setRowBusy((prev) => ({ ...prev, [topic.id]: false }));
     }
@@ -132,7 +132,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
     <div className="flex w-full flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Topic</CardTitle>
+          <CardTitle>Crear tema</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateTopic} className="flex flex-col gap-3 sm:flex-row">
@@ -143,7 +143,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
               disabled={isCreating}
             />
             <Button type="submit" disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create"}
+              {isCreating ? "Creando..." : "Crear"}
             </Button>
           </form>
         </CardContent>
@@ -152,7 +152,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Topics</CardTitle>
+            <CardTitle>Temas</CardTitle>
             <div className="flex items-center gap-2 text-sm">
               <input
                 id="include-inactive"
@@ -164,7 +164,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                   await loadTopics(checked);
                 }}
               />
-              <label htmlFor="include-inactive">Include inactive</label>
+              <label htmlFor="include-inactive">Incluir inactivos</label>
             </div>
           </div>
         </CardHeader>
@@ -179,7 +179,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
           ) : null}
 
           {isLoadingList ? (
-            <p className="text-sm text-muted-foreground">Loading topics...</p>
+            <p className="text-sm text-muted-foreground">Cargando temas...</p>
           ) : null}
 
           <div className="space-y-3">
@@ -196,7 +196,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                 >
                   <div className="min-w-20">
                     <Badge variant={topic.isActive ? "default" : "secondary"}>
-                      {topic.isActive ? "Active" : "Inactive"}
+                      {topic.isActive ? "Activo" : "Inactivo"}
                     </Badge>
                   </div>
 
@@ -224,7 +224,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                         })
                       }
                     >
-                      Save
+                      Guardar
                     </Button>
                     <Button
                       type="button"
@@ -236,7 +236,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                         })
                       }
                     >
-                      {topic.isActive ? "Deactivate" : "Activate"}
+                      {topic.isActive ? "Desactivar" : "Activar"}
                     </Button>
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
 
             {topics.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No topics found for current filters.
+                No se encontraron temas con los filtros actuales.
               </p>
             ) : null}
           </div>
@@ -254,4 +254,5 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
     </div>
   );
 }
+
 

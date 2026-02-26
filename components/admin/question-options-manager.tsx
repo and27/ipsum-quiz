@@ -34,7 +34,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
   return payload as T;
@@ -109,7 +109,7 @@ export function QuestionOptionsManager({
   );
 
   const statsLabel = useMemo(() => {
-    return `${options.length} options (${integrity.activeOptionsCount} active, ${integrity.activeCorrectOptionsCount} active correct)`;
+    return `${options.length} opciones (${integrity.activeOptionsCount} activas, ${integrity.activeCorrectOptionsCount} correctas activas)`;
   }, [options.length, integrity.activeCorrectOptionsCount, integrity.activeOptionsCount]);
 
   async function loadOptions(nextIncludeInactive = includeInactive) {
@@ -129,7 +129,7 @@ export function QuestionOptionsManager({
       setEditPosition(buildEditPosition(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load options.",
+        error instanceof Error ? error.message : "No se pudieron cargar las opciones.",
       );
     } finally {
       setIsLoadingList(false);
@@ -143,10 +143,10 @@ export function QuestionOptionsManager({
     try {
       const imageUrl = await uploadAdminImage("option", file);
       setNewImageUrl(imageUrl);
-      setSuccessMessage("Image uploaded for new option.");
+      setSuccessMessage("Imagen subida para la nueva opcion.");
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to upload image.",
+        error instanceof Error ? error.message : "No se pudo subir la imagen.",
       );
     } finally {
       setIsUploadingCreateImage(false);
@@ -163,10 +163,10 @@ export function QuestionOptionsManager({
         ...prev,
         [optionId]: imageUrl,
       }));
-      setSuccessMessage("Image uploaded.");
+      setSuccessMessage("Imagen subida.");
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to upload image.",
+        error instanceof Error ? error.message : "No se pudo subir la imagen.",
       );
     } finally {
       setRowImageBusy((prev) => ({ ...prev, [optionId]: false }));
@@ -198,11 +198,11 @@ export function QuestionOptionsManager({
       setNewImageUrl("");
       setNewPosition("");
       setNewIsCorrect(false);
-      setSuccessMessage("Option created.");
+      setSuccessMessage("Opcion creada.");
       await loadOptions(includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to create option.",
+        error instanceof Error ? error.message : "No se pudo crear la opcion.",
       );
     } finally {
       setIsCreating(false);
@@ -227,11 +227,11 @@ export function QuestionOptionsManager({
         },
       );
       await parseApiResponse<AdminQuestionOptionResponse>(response);
-      setSuccessMessage("Option updated.");
+      setSuccessMessage("Opcion actualizada.");
       await loadOptions(includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update option.",
+        error instanceof Error ? error.message : "No se pudo actualizar la opcion.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [option.id]: false }));
@@ -239,7 +239,7 @@ export function QuestionOptionsManager({
   }
 
   async function handleDeleteOption(option: QuestionOption) {
-    const confirmed = window.confirm("Delete this option?");
+    const confirmed = window.confirm("Eliminar esta opcion?");
     if (!confirmed) {
       return;
     }
@@ -254,11 +254,11 @@ export function QuestionOptionsManager({
         { method: "DELETE" },
       );
       await parseApiResponse<{ ok: true }>(response);
-      setSuccessMessage("Option deleted.");
+      setSuccessMessage("Opcion eliminada.");
       await loadOptions(includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to delete option.",
+        error instanceof Error ? error.message : "No se pudo eliminar la opcion.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [option.id]: false }));
@@ -269,18 +269,18 @@ export function QuestionOptionsManager({
     <div className="flex w-full flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Option</CardTitle>
+          <CardTitle>Crear opcion</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateOption} className="space-y-3">
             <Input
-              placeholder="Option text"
+              placeholder="Texto de la opcion"
               value={newText}
               onChange={(event) => setNewText(event.target.value)}
               disabled={isCreating}
             />
             <Input
-              placeholder="Image URL (optional)"
+              placeholder="URL de imagen (opcional)"
               value={newImageUrl}
               onChange={(event) => setNewImageUrl(event.target.value)}
               disabled={isCreating || isUploadingCreateImage}
@@ -288,7 +288,7 @@ export function QuestionOptionsManager({
             {newImageUrl ? (
               <img
                 src={newImageUrl}
-                alt="Option preview"
+                alt="Vista previa de la opcion"
                 className="max-h-40 rounded border object-contain"
               />
             ) : null}
@@ -307,13 +307,13 @@ export function QuestionOptionsManager({
             />
             {isUploadingCreateImage ? (
               <p className="text-xs text-muted-foreground">
-                Processing and uploading image...
+                Procesando y subiendo imagen...
               </p>
             ) : null}
             <Input
               type="number"
               min={1}
-              placeholder="Position (optional, auto if empty)"
+              placeholder="Posicion (opcional, automatica si vacio)"
               value={newPosition}
               onChange={(event) => setNewPosition(event.target.value)}
               disabled={isCreating}
@@ -325,10 +325,10 @@ export function QuestionOptionsManager({
                 onChange={(event) => setNewIsCorrect(event.target.checked)}
                 disabled={isCreating}
               />
-              Mark as correct
+              Marcar como correcta
             </label>
             <Button type="submit" disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create option"}
+              {isCreating ? "Creando..." : "Crear opcion"}
             </Button>
           </form>
         </CardContent>
@@ -337,7 +337,7 @@ export function QuestionOptionsManager({
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Options</CardTitle>
+            <CardTitle>Opciones</CardTitle>
             <div className="flex items-center gap-2 text-sm">
               <input
                 id="options-include-inactive"
@@ -349,7 +349,7 @@ export function QuestionOptionsManager({
                   await loadOptions(checked);
                 }}
               />
-              <label htmlFor="options-include-inactive">Include inactive</label>
+              <label htmlFor="options-include-inactive">Incluir inactivos</label>
             </div>
           </div>
         </CardHeader>
@@ -361,12 +361,12 @@ export function QuestionOptionsManager({
             }`}
           >
             {integrity.isReady
-              ? "Question bank status: ready."
-              : "Question bank status: not ready (needs >=2 active options and exactly 1 active correct)."}
+              ? "Estado del banco de preguntas: listo."
+              : "Estado del banco de preguntas: no listo (requiere >=2 opciones activas y exactamente 1 correcta activa)."}
           </p>
           {questionIsActive ? (
             <p className="text-sm text-muted-foreground">
-              This question is active. Some option changes are restricted to keep it valid.
+              Esta pregunta esta activa. Algunos cambios en opciones estan restringidos para mantenerla valida.
             </p>
           ) : null}
 
@@ -375,7 +375,7 @@ export function QuestionOptionsManager({
             <p className="text-sm text-green-600">{successMessage}</p>
           ) : null}
           {isLoadingList ? (
-            <p className="text-sm text-muted-foreground">Loading options...</p>
+            <p className="text-sm text-muted-foreground">Cargando opciones...</p>
           ) : null}
 
           <div className="space-y-3">
@@ -394,10 +394,10 @@ export function QuestionOptionsManager({
                 <div key={option.id} className="space-y-3 rounded-lg border p-3">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={option.isActive ? "default" : "secondary"}>
-                      {option.isActive ? "Active" : "Inactive"}
+                      {option.isActive ? "Activa" : "Inactiva"}
                     </Badge>
                     <Badge variant={option.isCorrect ? "default" : "outline"}>
-                      {option.isCorrect ? "Correct" : "Incorrect"}
+                      {option.isCorrect ? "Correcta" : "Incorrecta"}
                     </Badge>
                   </div>
 
@@ -411,7 +411,7 @@ export function QuestionOptionsManager({
 
                   <Input
                     value={imageUrl}
-                    placeholder="Image URL (optional)"
+                    placeholder="URL de imagen (opcional)"
                     onChange={(event) =>
                       setEditImageUrl((prev) => ({
                         ...prev,
@@ -423,7 +423,7 @@ export function QuestionOptionsManager({
                   {imageUrl ? (
                     <img
                       src={imageUrl}
-                      alt="Option preview"
+                      alt="Vista previa de la opcion"
                       className="max-h-40 rounded border object-contain"
                     />
                   ) : null}
@@ -442,7 +442,7 @@ export function QuestionOptionsManager({
                   />
                   {uploadingImage ? (
                     <p className="text-xs text-muted-foreground">
-                      Processing and uploading image...
+                      Procesando y subiendo imagen...
                     </p>
                   ) : null}
 
@@ -472,7 +472,7 @@ export function QuestionOptionsManager({
                         })
                       }
                     >
-                      Save
+                      Guardar
                     </Button>
                     <Button
                       type="button"
@@ -480,7 +480,7 @@ export function QuestionOptionsManager({
                       disabled={busy || uploadingImage || option.isCorrect}
                       onClick={() => handleUpdateOption(option, { isCorrect: true })}
                     >
-                      {option.isCorrect ? "Current correct" : "Set correct"}
+                      {option.isCorrect ? "Correcta actual" : "Definir correcta"}
                     </Button>
                     <Button
                       type="button"
@@ -490,7 +490,7 @@ export function QuestionOptionsManager({
                         handleUpdateOption(option, { isActive: !option.isActive })
                       }
                     >
-                      {option.isActive ? "Deactivate" : "Activate"}
+                      {option.isActive ? "Desactivar" : "Activar"}
                     </Button>
                     <Button
                       type="button"
@@ -498,7 +498,7 @@ export function QuestionOptionsManager({
                       disabled={busy || uploadingImage}
                       onClick={() => handleDeleteOption(option)}
                     >
-                      Delete
+                      Eliminar
                     </Button>
                   </div>
                 </div>
@@ -507,10 +507,11 @@ export function QuestionOptionsManager({
           </div>
 
           {options.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No options found.</p>
+            <p className="text-sm text-muted-foreground">No se encontraron opciones.</p>
           ) : null}
         </CardContent>
       </Card>
     </div>
   );
 }
+

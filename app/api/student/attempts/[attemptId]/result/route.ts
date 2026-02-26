@@ -14,7 +14,7 @@ export async function GET(
     const session = await requireStudent();
     const { attemptId } = await context.params;
     if (!attemptId) {
-      return NextResponse.json({ error: "Invalid attempt id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de intento invalido." }, { status: 400 });
     }
 
     const response: StudentAttemptResultResponse = await getAttemptResultForStudent({
@@ -32,9 +32,10 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
     return NextResponse.json(
-      { error: "Failed to load attempt result." },
+      { error: "No se pudo cargar el resultado del intento." },
       { status: 500 },
     );
   }
 }
+
 

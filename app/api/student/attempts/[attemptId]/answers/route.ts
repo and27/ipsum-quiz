@@ -21,12 +21,12 @@ export async function PATCH(
     const session = await requireStudent();
     const { attemptId } = await context.params;
     if (!attemptId) {
-      return NextResponse.json({ error: "Invalid attempt id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de intento invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body) || typeof body.simulatorVersionQuestionId !== "string") {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const selectedOptionId =
@@ -38,7 +38,7 @@ export async function PATCH(
 
     if (typeof selectedOptionId === "undefined") {
       return NextResponse.json(
-        { error: "selectedOptionId must be string or null." },
+        { error: "selectedOptionId debe ser string o null." },
         { status: 400 },
       );
     }
@@ -77,9 +77,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Failed to save attempt answer." },
+      { error: "No se pudo guardar la respuesta del intento." },
       { status: 500 },
     );
   }
 }
+
 

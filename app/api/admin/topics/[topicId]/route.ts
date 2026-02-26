@@ -16,13 +16,13 @@ export async function PATCH(
 
     const { topicId } = await context.params;
     if (!topicId) {
-      return NextResponse.json({ error: "Invalid topic id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de tema invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
 
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminTopicUpdateRequest = {};
@@ -34,7 +34,7 @@ export async function PATCH(
     }
 
     if (typeof payload.name === "undefined" && typeof payload.isActive === "undefined") {
-      return NextResponse.json({ error: "No changes provided." }, { status: 400 });
+      return NextResponse.json({ error: "No se proporcionaron cambios." }, { status: 400 });
     }
 
     const topic = await updateTopic(topicId, payload);
@@ -57,6 +57,7 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({ error: "Failed to update topic." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo actualizar el tema." }, { status: 500 });
   }
 }
+

@@ -14,7 +14,7 @@ export async function POST(
     await requireAdmin();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const result = await duplicatePublishedVersionToDraft(simulatorId);
@@ -40,9 +40,10 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to duplicate published version." },
+      { error: "No se pudo duplicar la version publicada." },
       { status: 500 },
     );
   }
 }
+
 

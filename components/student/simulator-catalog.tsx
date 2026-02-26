@@ -19,7 +19,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
   return payload as T;
@@ -46,7 +46,7 @@ export function StudentSimulatorCatalog({ simulators }: StudentSimulatorCatalogP
 
       window.location.href = `/protected/student/attempts/${payload.attemptId}/exam`;
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to start attempt.");
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo iniciar el intento.");
       setBusySimulatorId(null);
     }
   }
@@ -60,17 +60,17 @@ export function StudentSimulatorCatalog({ simulators }: StudentSimulatorCatalogP
           <div key={simulator.id} className="rounded-lg border p-3">
             <h2 className="font-semibold">{simulator.title}</h2>
             <p className="text-sm text-muted-foreground">
-              {simulator.description ?? "No description"}
+              {simulator.description ?? "Sin descripcion"}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Duration: {simulator.durationMinutes} min | Attempts: {simulator.maxAttempts} |
-              Access code: {simulator.hasAccessCode ? "Required" : "Not required"}
+              Duracion: {simulator.durationMinutes} min | Intentos: {simulator.maxAttempts} |
+              Codigo de acceso: {simulator.hasAccessCode ? "Requerido" : "No requerido"}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {simulator.hasAccessCode ? (
                 <Input
-                  placeholder="Access code"
+                  placeholder="Codigo de acceso"
                   value={accessCodes[simulator.id] ?? ""}
                   onChange={(event) =>
                     setAccessCodes((prev) => ({
@@ -83,16 +83,17 @@ export function StudentSimulatorCatalog({ simulators }: StudentSimulatorCatalogP
                 />
               ) : null}
               <Button type="button" disabled={busy} onClick={() => handleStart(simulator.id)}>
-                {busy ? "Starting..." : "Start / Resume"}
+                {busy ? "Iniciando..." : "Iniciar / Reanudar"}
               </Button>
             </div>
           </div>
         );
       })}
       {simulators.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No simulators available.</p>
+        <p className="text-sm text-muted-foreground">No hay simuladores disponibles.</p>
       ) : null}
     </div>
   );
 }
+
 

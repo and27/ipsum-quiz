@@ -27,7 +27,7 @@ export default async function ProtectedLayout({
                 Ipsum Quiz
               </Link>
               <span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
-                {isAdmin ? "Admin" : "Student"}
+                {isAdmin ? "Administrador" : "Estudiante"}
               </span>
             </div>
             <Suspense>

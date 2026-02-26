@@ -24,9 +24,9 @@ async function AdminQuestionsContent() {
   return (
     <div className="flex w-full flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin - Questions</h1>
+        <h1 className="text-2xl font-bold">Admin - Preguntas</h1>
         <p className="text-sm text-muted-foreground">
-          Create, edit and activate/deactivate questions.
+          Crea, edita y activa/desactiva preguntas.
         </p>
       </div>
 
@@ -48,7 +48,7 @@ async function AdminQuestionsContent() {
 
 export default function AdminQuestionsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <AdminQuestionsContent />
     </Suspense>
   );

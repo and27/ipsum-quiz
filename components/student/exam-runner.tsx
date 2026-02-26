@@ -27,7 +27,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
   return payload as T;
@@ -84,7 +84,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
       );
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to save answer.",
+        error instanceof Error ? error.message : "No se pudo guardar la respuesta.",
       );
     } finally {
       setSavingQuestionId(null);
@@ -111,7 +111,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
       setFinishResult(payload);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to finish attempt.",
+        error instanceof Error ? error.message : "No se pudo finalizar el intento.",
       );
     } finally {
       setIsFinishing(false);
@@ -122,7 +122,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
     return (
       <Card>
         <CardContent className="py-6 text-sm text-muted-foreground">
-          No questions available for this attempt.
+          No hay preguntas disponibles para este intento.
         </CardContent>
       </Card>
     );
@@ -258,3 +258,4 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
     </div>
   );
 }
+

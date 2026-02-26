@@ -14,7 +14,7 @@ export async function GET(
     const session = await requireStudent();
     const { attemptId } = await context.params;
     if (!attemptId) {
-      return NextResponse.json({ error: "Invalid attempt id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de intento invalido." }, { status: 400 });
     }
 
     const result = await getAttemptExamStateForStudent({
@@ -39,7 +39,8 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "Failed to load exam state." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo cargar el estado del examen." }, { status: 500 });
   }
 }
+
 

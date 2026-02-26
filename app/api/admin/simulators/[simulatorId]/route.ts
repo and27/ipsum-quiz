@@ -16,12 +16,12 @@ export async function PATCH(
 
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminSimulatorUpdateRequest = {};
@@ -68,9 +68,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Failed to update simulator." },
+      { error: "No se pudo actualizar el simulador." },
       { status: 500 },
     );
   }
 }
+
 

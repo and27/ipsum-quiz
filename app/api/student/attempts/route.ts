@@ -29,9 +29,10 @@ export async function GET(request: NextRequest) {
       return authResponse;
     }
     return NextResponse.json(
-      { error: "Failed to load attempt history." },
+      { error: "No se pudo cargar el historial de intentos." },
       { status: 500 },
     );
   }
 }
+
 

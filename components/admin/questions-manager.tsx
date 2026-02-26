@@ -35,7 +35,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
 
@@ -106,7 +106,7 @@ export function QuestionsManager({
 
   const totalLabel = useMemo(() => {
     const active = questions.filter((question) => question.isActive).length;
-    return `Showing ${questions.length} of ${meta.total} questions (${active} active on page)`;
+    return `Mostrando ${questions.length} de ${meta.total} preguntas (${active} activas en la pagina)`;
   }, [questions, meta.total]);
   const hasTopics = availableTopics.length > 0;
 
@@ -127,7 +127,7 @@ export function QuestionsManager({
       setEditImageUrls(buildEditImageUrls(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load questions.",
+        error instanceof Error ? error.message : "No se pudieron cargar las preguntas.",
       );
     } finally {
       setIsLoadingList(false);
@@ -155,11 +155,11 @@ export function QuestionsManager({
       await parseApiResponse<AdminQuestionResponse>(response);
       setNewStatement("");
       setNewImageUrl("");
-      setSuccessMessage("Question created.");
+      setSuccessMessage("Pregunta creada.");
       await loadQuestions(1, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to create question.",
+        error instanceof Error ? error.message : "No se pudo crear la pregunta.",
       );
     } finally {
       setIsCreating(false);
@@ -173,10 +173,10 @@ export function QuestionsManager({
     try {
       const imageUrl = await uploadAdminImage("question", file);
       setNewImageUrl(imageUrl);
-      setSuccessMessage("Image uploaded for new question.");
+      setSuccessMessage("Imagen subida para la nueva pregunta.");
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to upload image.",
+        error instanceof Error ? error.message : "No se pudo subir la imagen.",
       );
     } finally {
       setIsUploadingCreateImage(false);
@@ -193,10 +193,10 @@ export function QuestionsManager({
         ...prev,
         [questionId]: imageUrl,
       }));
-      setSuccessMessage("Image uploaded.");
+      setSuccessMessage("Imagen subida.");
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to upload image.",
+        error instanceof Error ? error.message : "No se pudo subir la imagen.",
       );
     } finally {
       setRowImageBusy((prev) => ({ ...prev, [questionId]: false }));
@@ -218,11 +218,11 @@ export function QuestionsManager({
         body: JSON.stringify(payload),
       });
       await parseApiResponse<AdminQuestionResponse>(response);
-      setSuccessMessage("Question updated.");
+      setSuccessMessage("Pregunta actualizada.");
       await loadQuestions(meta.page, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update question.",
+        error instanceof Error ? error.message : "No se pudo actualizar la pregunta.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [question.id]: false }));
@@ -233,7 +233,7 @@ export function QuestionsManager({
     <div className="flex w-full flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Question</CardTitle>
+          <CardTitle>Crear pregunta</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateQuestion} className="space-y-3">
@@ -252,14 +252,14 @@ export function QuestionsManager({
 
             <textarea
               className="min-h-24 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              placeholder="Question statement"
+              placeholder="Enunciado de la pregunta"
               value={newStatement}
               onChange={(event) => setNewStatement(event.target.value)}
               disabled={isCreating}
             />
 
             <Input
-              placeholder="Image URL (optional)"
+              placeholder="URL de imagen (opcional)"
               value={newImageUrl}
               onChange={(event) => setNewImageUrl(event.target.value)}
               disabled={isCreating || isUploadingCreateImage}
@@ -267,7 +267,7 @@ export function QuestionsManager({
             {newImageUrl ? (
               <img
                 src={newImageUrl}
-                alt="Question preview"
+                alt="Vista previa de la pregunta"
                 className="max-h-48 rounded border object-contain"
               />
             ) : null}
@@ -286,16 +286,16 @@ export function QuestionsManager({
             />
             {isUploadingCreateImage ? (
               <p className="text-xs text-muted-foreground">
-                Processing and uploading image...
+                Procesando y subiendo imagen...
               </p>
             ) : null}
 
             <Button type="submit" disabled={isCreating || !hasTopics}>
-              {isCreating ? "Creating..." : "Create question"}
+              {isCreating ? "Creando..." : "Crear pregunta"}
             </Button>
             {!hasTopics ? (
               <p className="text-xs text-muted-foreground">
-                Create at least one active topic before creating questions.
+                Crea al menos un tema activo antes de crear preguntas.
               </p>
             ) : null}
           </form>
@@ -305,7 +305,7 @@ export function QuestionsManager({
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Questions</CardTitle>
+            <CardTitle>Preguntas</CardTitle>
             <div className="flex items-center gap-2 text-sm">
               <input
                 id="questions-include-inactive"
@@ -317,7 +317,7 @@ export function QuestionsManager({
                   await loadQuestions(1, checked);
                 }}
               />
-              <label htmlFor="questions-include-inactive">Include inactive</label>
+              <label htmlFor="questions-include-inactive">Incluir inactivos</label>
             </div>
           </div>
         </CardHeader>
@@ -330,7 +330,7 @@ export function QuestionsManager({
           ) : null}
 
           {isLoadingList ? (
-            <p className="text-sm text-muted-foreground">Loading questions...</p>
+            <p className="text-sm text-muted-foreground">Cargando preguntas...</p>
           ) : null}
 
           <div className="space-y-4">
@@ -351,16 +351,16 @@ export function QuestionsManager({
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Badge variant={question.isActive ? "default" : "secondary"}>
-                        {question.isActive ? "Active" : "Inactive"}
+                        {question.isActive ? "Activa" : "Inactiva"}
                       </Badge>
                       <Badge variant={question.isBankReady ? "default" : "outline"}>
-                        {question.isBankReady ? "Bank Ready" : "Bank Not Ready"}
+                        {question.isBankReady ? "Lista para banco" : "No lista para banco"}
                       </Badge>
                     </div>
-                    <span className="text-xs text-muted-foreground">Topic: {question.topicName}</span>
+                    <span className="text-xs text-muted-foreground">Tema: {question.topicName}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Active options: {question.activeOptionsCount} | Active correct:{" "}
+                    Opciones activas: {question.activeOptionsCount} | Correctas activas:{" "}
                     {question.activeCorrectOptionsCount}
                   </p>
 
@@ -395,7 +395,7 @@ export function QuestionsManager({
                   />
 
                   <Input
-                    placeholder="Image URL (optional)"
+                    placeholder="URL de imagen (opcional)"
                     value={editedImageUrl}
                     onChange={(event) =>
                       setEditImageUrls((prev) => ({
@@ -408,7 +408,7 @@ export function QuestionsManager({
                   {editedImageUrl ? (
                     <img
                       src={editedImageUrl}
-                      alt="Question preview"
+                      alt="Vista previa de la pregunta"
                       className="max-h-48 rounded border object-contain"
                     />
                   ) : null}
@@ -427,14 +427,14 @@ export function QuestionsManager({
                   />
                   {uploadingImage ? (
                     <p className="text-xs text-muted-foreground">
-                      Processing and uploading image...
+                      Procesando y subiendo imagen...
                     </p>
                   ) : null}
 
                   <div className="flex gap-2">
                     <Button asChild type="button" variant="outline" disabled={busy || uploadingImage}>
                       <Link href={`/protected/admin/questions/${question.id}/options`}>
-                        Manage options
+                        Gestionar opciones
                       </Link>
                     </Button>
                     <Button
@@ -449,7 +449,7 @@ export function QuestionsManager({
                         })
                       }
                     >
-                      Save
+                      Guardar
                     </Button>
                     <Button
                       type="button"
@@ -465,12 +465,12 @@ export function QuestionsManager({
                         })
                       }
                     >
-                      {question.isActive ? "Deactivate" : "Activate"}
+                      {question.isActive ? "Desactivar" : "Activar"}
                     </Button>
                   </div>
                   {!question.isBankReady && !question.isActive ? (
                     <p className="text-xs text-amber-600">
-                      To activate, this question needs at least 2 active options and exactly 1 active correct option.
+                      Para activar, esta pregunta necesita al menos 2 opciones activas y exactamente 1 opcion correcta activa.
                     </p>
                   ) : null}
                 </div>
@@ -480,13 +480,13 @@ export function QuestionsManager({
 
           {questions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No questions found for current filters.
+              No se encontraron preguntas con los filtros actuales.
             </p>
           ) : null}
 
           <div className="flex items-center justify-between border-t pt-3">
             <p className="text-xs text-muted-foreground">
-              Page {meta.page} of {meta.totalPages}
+              Pagina {meta.page} de {meta.totalPages}
             </p>
             <div className="flex gap-2">
               <Button
@@ -495,7 +495,7 @@ export function QuestionsManager({
                 disabled={meta.page <= 1 || isLoadingList}
                 onClick={() => loadQuestions(meta.page - 1, includeInactive)}
               >
-                Previous
+                Anterior
               </Button>
               <Button
                 type="button"
@@ -503,7 +503,7 @@ export function QuestionsManager({
                 disabled={meta.page >= meta.totalPages || isLoadingList}
                 onClick={() => loadQuestions(meta.page + 1, includeInactive)}
               >
-                Next
+                Siguiente
               </Button>
             </div>
           </div>
@@ -512,3 +512,4 @@ export function QuestionsManager({
     </div>
   );
 }
+

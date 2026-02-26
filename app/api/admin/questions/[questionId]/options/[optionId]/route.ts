@@ -19,12 +19,12 @@ export async function PATCH(
     await requireAdmin();
     const { questionId, optionId } = await context.params;
     if (!questionId || !optionId) {
-      return NextResponse.json({ error: "Invalid route params." }, { status: 400 });
+      return NextResponse.json({ error: "Parametros de ruta invalidos." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminQuestionOptionUpdateRequest = {};
@@ -67,7 +67,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Failed to update question option." },
+      { error: "No se pudo actualizar la opcion de la pregunta." },
       { status: 500 },
     );
   }
@@ -81,7 +81,7 @@ export async function DELETE(
     await requireAdmin();
     const { questionId, optionId } = await context.params;
     if (!questionId || !optionId) {
-      return NextResponse.json({ error: "Invalid route params." }, { status: 400 });
+      return NextResponse.json({ error: "Parametros de ruta invalidos." }, { status: 400 });
     }
 
     await deleteQuestionOption(questionId, optionId);
@@ -100,8 +100,9 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { error: "Failed to delete question option." },
+      { error: "No se pudo eliminar la opcion de la pregunta." },
       { status: 500 },
     );
   }
 }
+

@@ -14,7 +14,7 @@ export async function POST(
     await requireAdmin();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const validation = await validateDraftVersionBeforePublish(simulatorId);
@@ -34,8 +34,9 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to validate draft version for publish." },
+      { error: "No se pudo validar la version borrador para publicar." },
       { status: 500 },
     );
   }
 }
+

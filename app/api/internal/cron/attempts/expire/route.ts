@@ -29,7 +29,7 @@ function parseLimit(raw: string | null): number | undefined {
 
 async function handle(request: NextRequest) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     return await handle(request);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to run expiration job." },
+      { error: error instanceof Error ? error.message : "No se pudo ejecutar la expiracion de intentos." },
       { status: 500 },
     );
   }
@@ -58,9 +58,10 @@ export async function GET(request: NextRequest) {
     return await handle(request);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to run expiration job." },
+      { error: error instanceof Error ? error.message : "No se pudo ejecutar la expiracion de intentos." },
       { status: 500 },
     );
   }
 }
+
 

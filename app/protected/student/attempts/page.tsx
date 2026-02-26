@@ -66,9 +66,8 @@ async function StudentAttemptHistoryContent() {
 
 export default function StudentAttemptHistoryPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <StudentAttemptHistoryContent />
     </Suspense>
   );
 }
-

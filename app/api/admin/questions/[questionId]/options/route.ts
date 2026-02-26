@@ -22,7 +22,7 @@ export async function GET(
     await requireAdmin();
     const { questionId } = await context.params;
     if (!questionId) {
-      return NextResponse.json({ error: "Invalid question id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de pregunta invalido." }, { status: 400 });
     }
 
     const includeInactive =
@@ -48,7 +48,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { error: "Failed to list question options." },
+      { error: "No se pudieron listar las opciones de la pregunta." },
       { status: 500 },
     );
   }
@@ -62,12 +62,12 @@ export async function POST(
     await requireAdmin();
     const { questionId } = await context.params;
     if (!questionId) {
-      return NextResponse.json({ error: "Invalid question id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de pregunta invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body) || typeof body.text !== "string") {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminQuestionOptionCreateRequest = {
@@ -105,8 +105,9 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to create question option." },
+      { error: "No se pudo crear la opcion de la pregunta." },
       { status: 500 },
     );
   }
 }
+

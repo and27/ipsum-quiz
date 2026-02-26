@@ -86,9 +86,8 @@ export default function StudentAttemptResultPage({
   params: Promise<{ attemptId: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <StudentAttemptResultContent params={params} />
     </Suspense>
   );
 }
-

@@ -14,7 +14,7 @@ export async function GET(
     const session = await requireStudent();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const attempt = await getActiveAttemptForStudent({
@@ -38,9 +38,10 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { error: "Failed to load active attempt." },
+      { error: "No se pudo cargar el intento activo." },
       { status: 500 },
     );
   }
 }
+
 

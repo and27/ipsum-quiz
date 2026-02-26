@@ -19,12 +19,12 @@ export async function PATCH(
     await requireAdmin();
     const { simulatorId, versionQuestionId } = await context.params;
     if (!simulatorId || !versionQuestionId) {
-      return NextResponse.json({ error: "Invalid route params." }, { status: 400 });
+      return NextResponse.json({ error: "Parametros de ruta invalidos." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body) || typeof body.position !== "number") {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminSimulatorBuilderReorderQuestionRequest = {
@@ -54,7 +54,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Failed to reorder draft question." },
+      { error: "No se pudo reordenar la pregunta del borrador." },
       { status: 500 },
     );
   }
@@ -68,7 +68,7 @@ export async function DELETE(
     await requireAdmin();
     const { simulatorId, versionQuestionId } = await context.params;
     if (!simulatorId || !versionQuestionId) {
-      return NextResponse.json({ error: "Invalid route params." }, { status: 400 });
+      return NextResponse.json({ error: "Parametros de ruta invalidos." }, { status: 400 });
     }
 
     await removeQuestionFromDraftVersion(simulatorId, versionQuestionId);
@@ -90,8 +90,9 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { error: "Failed to remove draft question." },
+      { error: "No se pudo quitar la pregunta del borrador." },
       { status: 500 },
     );
   }
 }
+

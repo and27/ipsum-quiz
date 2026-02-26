@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       !(processedJpegFile instanceof File)
     ) {
       return NextResponse.json(
-        { error: "Invalid upload payload." },
+        { error: "Payload de carga invalido." },
         { status: 400 },
       );
     }
@@ -57,8 +57,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Failed to upload image." },
+      { error: "No se pudo subir la imagen." },
       { status: 500 },
     );
   }
 }
+

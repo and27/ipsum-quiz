@@ -20,12 +20,12 @@ export async function POST(
     const session = await requireStudent();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const accessCode =
@@ -76,6 +76,7 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "Failed to start attempt." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo iniciar el intento." }, { status: 500 });
   }
 }
+

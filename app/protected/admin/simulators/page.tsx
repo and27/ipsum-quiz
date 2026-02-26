@@ -23,9 +23,9 @@ async function AdminSimulatorsContent() {
   return (
     <div className="flex w-full flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin - Simulators</h1>
+        <h1 className="text-2xl font-bold">Admin - Simuladores</h1>
         <p className="text-sm text-muted-foreground">
-          Create and manage simulators.
+          Crea y administra simuladores.
         </p>
       </div>
 
@@ -46,9 +46,8 @@ async function AdminSimulatorsContent() {
 
 export default function AdminSimulatorsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <AdminSimulatorsContent />
     </Suspense>
   );
 }
-

@@ -41,9 +41,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Failed to list visible simulators." },
+      { error: "No se pudo listar los simuladores visibles." },
       { status: 500 },
     );
   }
 }
+
 

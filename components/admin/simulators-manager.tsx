@@ -30,7 +30,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
 
@@ -93,7 +93,7 @@ export function SimulatorsManager({
 
   const totalLabel = useMemo(() => {
     const active = simulators.filter((simulator) => simulator.isActive).length;
-    return `Showing ${simulators.length} of ${meta.total} simulators (${active} active on page)`;
+    return `Mostrando ${simulators.length} de ${meta.total} simuladores (${active} activos en la pagina)`;
   }, [simulators, meta.total]);
 
   async function loadSimulators(nextPage = meta.page, nextIncludeInactive = includeInactive) {
@@ -115,7 +115,7 @@ export function SimulatorsManager({
       setEditAccessCode({});
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load simulators.",
+        error instanceof Error ? error.message : "No se pudieron cargar los simuladores.",
       );
     } finally {
       setIsLoadingList(false);
@@ -148,11 +148,11 @@ export function SimulatorsManager({
       setNewDurationMinutes("60");
       setNewMaxAttempts("3");
       setNewAccessCode("");
-      setSuccessMessage("Simulator created.");
+      setSuccessMessage("Simulador creado.");
       await loadSimulators(1, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to create simulator.",
+        error instanceof Error ? error.message : "No se pudo crear el simulador.",
       );
     } finally {
       setIsCreating(false);
@@ -174,11 +174,11 @@ export function SimulatorsManager({
         body: JSON.stringify(payload),
       });
       await parseApiResponse<AdminSimulatorResponse>(response);
-      setSuccessMessage("Simulator updated.");
+      setSuccessMessage("Simulador actualizado.");
       await loadSimulators(meta.page, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update simulator.",
+        error instanceof Error ? error.message : "No se pudo actualizar el simulador.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [simulator.id]: false }));
@@ -189,17 +189,17 @@ export function SimulatorsManager({
     <div className="flex w-full flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Simulator</CardTitle>
+          <CardTitle>Crear simulador</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateSimulator} className="space-y-3">
             <div className="space-y-1">
               <label htmlFor="new-simulator-title" className="text-sm font-medium">
-                Title
+                Titulo
               </label>
               <Input
                 id="new-simulator-title"
-                placeholder="Simulator title"
+                placeholder="Titulo del simulador"
                 value={newTitle}
                 onChange={(event) => setNewTitle(event.target.value)}
                 disabled={isCreating}
@@ -207,12 +207,12 @@ export function SimulatorsManager({
             </div>
             <div className="space-y-1">
               <label htmlFor="new-simulator-description" className="text-sm font-medium">
-                Description
+                Descripcion
               </label>
               <textarea
                 id="new-simulator-description"
                 className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-                placeholder="Description (optional)"
+                placeholder="Descripcion (opcional)"
                 value={newDescription}
                 onChange={(event) => setNewDescription(event.target.value)}
                 disabled={isCreating}
@@ -221,14 +221,14 @@ export function SimulatorsManager({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label htmlFor="new-simulator-duration" className="text-sm font-medium">
-                  Duration (minutes)
+                  Duracion (minutos)
                 </label>
                 <Input
                   id="new-simulator-duration"
                   type="number"
                   min={1}
                   max={600}
-                  placeholder="Duration minutes"
+                  placeholder="Duracion en minutos"
                   value={newDurationMinutes}
                   onChange={(event) => setNewDurationMinutes(event.target.value)}
                   disabled={isCreating}
@@ -236,14 +236,14 @@ export function SimulatorsManager({
               </div>
               <div className="space-y-1">
                 <label htmlFor="new-simulator-max-attempts" className="text-sm font-medium">
-                  Max attempts
+                  Intentos maximos
                 </label>
                 <Input
                   id="new-simulator-max-attempts"
                   type="number"
                   min={1}
                   max={20}
-                  placeholder="Max attempts"
+                  placeholder="Intentos maximos"
                   value={newMaxAttempts}
                   onChange={(event) => setNewMaxAttempts(event.target.value)}
                   disabled={isCreating}
@@ -252,18 +252,18 @@ export function SimulatorsManager({
             </div>
             <div className="space-y-1">
               <label htmlFor="new-simulator-access-code" className="text-sm font-medium">
-                Access code
+                Codigo de acceso
               </label>
               <Input
                 id="new-simulator-access-code"
-                placeholder="Access code (optional)"
+                placeholder="Codigo de acceso (opcional)"
                 value={newAccessCode}
                 onChange={(event) => setNewAccessCode(event.target.value)}
                 disabled={isCreating}
               />
             </div>
             <Button type="submit" disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create simulator"}
+              {isCreating ? "Creando..." : "Crear simulador"}
             </Button>
           </form>
         </CardContent>
@@ -272,7 +272,7 @@ export function SimulatorsManager({
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Simulators</CardTitle>
+            <CardTitle>Simuladores</CardTitle>
             <div className="flex items-center gap-2 text-sm">
               <input
                 id="simulators-include-inactive"
@@ -284,7 +284,7 @@ export function SimulatorsManager({
                   await loadSimulators(1, checked);
                 }}
               />
-              <label htmlFor="simulators-include-inactive">Include inactive</label>
+              <label htmlFor="simulators-include-inactive">Incluir inactivos</label>
             </div>
           </div>
         </CardHeader>
@@ -297,7 +297,7 @@ export function SimulatorsManager({
           ) : null}
 
           {isLoadingList ? (
-            <p className="text-sm text-muted-foreground">Loading simulators...</p>
+            <p className="text-sm text-muted-foreground">Cargando simuladores...</p>
           ) : null}
 
           <div className="space-y-4">
@@ -322,11 +322,11 @@ export function SimulatorsManager({
                 <div key={simulator.id} className="space-y-3 rounded-lg border p-3">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={simulator.isActive ? "default" : "secondary"}>
-                      {simulator.isActive ? "Active" : "Inactive"}
+                      {simulator.isActive ? "Activo" : "Inactivo"}
                     </Badge>
                     <Badge variant="outline">{simulator.status}</Badge>
                     <Badge variant={simulator.hasAccessCode ? "default" : "outline"}>
-                      {simulator.hasAccessCode ? "Access code set" : "No access code"}
+                      {simulator.hasAccessCode ? "Codigo configurado" : "Sin codigo"}
                     </Badge>
                   </div>
 
@@ -342,7 +342,7 @@ export function SimulatorsManager({
                     htmlFor={`simulator-title-${simulator.id}`}
                     className="sr-only"
                   >
-                    Simulator title
+                    Titulo del simulador
                   </label>
 
                   <textarea
@@ -361,7 +361,7 @@ export function SimulatorsManager({
                     htmlFor={`simulator-description-${simulator.id}`}
                     className="sr-only"
                   >
-                    Simulator description
+                    Descripcion del simulador
                   </label>
 
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -383,7 +383,7 @@ export function SimulatorsManager({
                       htmlFor={`simulator-duration-${simulator.id}`}
                       className="sr-only"
                     >
-                      Duration minutes
+                      Duracion en minutos
                     </label>
 
                     <Input
@@ -404,13 +404,13 @@ export function SimulatorsManager({
                       htmlFor={`simulator-max-attempts-${simulator.id}`}
                       className="sr-only"
                     >
-                      Max attempts
+                      Intentos maximos
                     </label>
                   </div>
 
                   <Input
                     id={`simulator-access-code-${simulator.id}`}
-                    placeholder="New access code (leave empty to keep current)"
+                    placeholder="Nuevo codigo de acceso (deja vacio para mantener el actual)"
                     value={accessCode}
                     onChange={(event) =>
                       setEditAccessCode((prev) => ({
@@ -424,13 +424,13 @@ export function SimulatorsManager({
                     htmlFor={`simulator-access-code-${simulator.id}`}
                     className="sr-only"
                   >
-                    New access code
+                    Nuevo codigo de acceso
                   </label>
 
                   <div className="flex flex-wrap gap-2">
                     <Button asChild type="button" variant="outline" disabled={busy}>
                       <Link href={`/protected/admin/simulators/${simulator.id}/builder`}>
-                        Open builder
+                        Abrir constructor
                       </Link>
                     </Button>
                     <Button
@@ -447,7 +447,7 @@ export function SimulatorsManager({
                         })
                       }
                     >
-                      Save
+                      Guardar
                     </Button>
 
                     <Button
@@ -460,7 +460,7 @@ export function SimulatorsManager({
                         })
                       }
                     >
-                      {simulator.isActive ? "Deactivate" : "Activate"}
+                      {simulator.isActive ? "Desactivar" : "Activar"}
                     </Button>
 
                     {simulator.hasAccessCode ? (
@@ -474,7 +474,7 @@ export function SimulatorsManager({
                           })
                         }
                       >
-                        Remove access code
+                        Quitar codigo de acceso
                       </Button>
                     ) : null}
                   </div>
@@ -485,13 +485,13 @@ export function SimulatorsManager({
 
           {simulators.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No simulators found for current filters.
+              No se encontraron simuladores con los filtros actuales.
             </p>
           ) : null}
 
           <div className="flex items-center justify-between border-t pt-3">
             <p className="text-xs text-muted-foreground">
-              Page {meta.page} of {meta.totalPages}
+              Pagina {meta.page} de {meta.totalPages}
             </p>
             <div className="flex gap-2">
               <Button
@@ -500,7 +500,7 @@ export function SimulatorsManager({
                 disabled={meta.page <= 1 || isLoadingList}
                 onClick={() => loadSimulators(meta.page - 1, includeInactive)}
               >
-                Previous
+                Anterior
               </Button>
               <Button
                 type="button"
@@ -508,7 +508,7 @@ export function SimulatorsManager({
                 disabled={meta.page >= meta.totalPages || isLoadingList}
                 onClick={() => loadSimulators(meta.page + 1, includeInactive)}
               >
-                Next
+                Siguiente
               </Button>
             </div>
           </div>
@@ -517,3 +517,4 @@ export function SimulatorsManager({
     </div>
   );
 }
+

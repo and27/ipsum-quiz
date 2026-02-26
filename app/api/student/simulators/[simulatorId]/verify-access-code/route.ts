@@ -23,12 +23,12 @@ export async function POST(
     const { simulatorId } = await context.params;
 
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body)) {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: StudentVerifyAccessCodeRequest = {
@@ -68,9 +68,10 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to verify access code." },
+      { error: "No se pudo verificar el codigo de acceso." },
       { status: 500 },
     );
   }
 }
+
 

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ADMIN_LINKS = [
-  { href: "/protected/admin/simulators", label: "Simulators" },
-  { href: "/protected/admin/questions", label: "Questions" },
-  { href: "/protected/admin/topics", label: "Topics" },
+  { href: "/protected/admin/simulators", label: "Simuladores" },
+  { href: "/protected/admin/questions", label: "Preguntas" },
+  { href: "/protected/admin/topics", label: "Temas" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -41,7 +41,7 @@ export function AdminSidebar() {
 
       <aside className="hidden w-64 shrink-0 border-r pr-4 md:block">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Admin
+          Administrador
         </p>
         <nav className="flex flex-col gap-2">
           {ADMIN_LINKS.map((item) => (
@@ -58,4 +58,3 @@ export function AdminSidebar() {
     </>
   );
 }
-

@@ -43,7 +43,7 @@ async function AdminSimulatorBuilderContent({
   return (
     <div className="flex w-full flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Simulator Builder</h1>
+        <h1 className="text-2xl font-bold">Constructor de simulador</h1>
         <p className="text-sm text-muted-foreground">{builderState.simulator.title}</p>
       </div>
 
@@ -62,9 +62,8 @@ export default function AdminSimulatorBuilderPage({
   params: Promise<{ simulatorId: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <AdminSimulatorBuilderContent params={params} />
     </Suspense>
   );
 }
-

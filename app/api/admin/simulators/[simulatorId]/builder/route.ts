@@ -22,7 +22,7 @@ export async function GET(
     await requireAdmin();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const state = await getSimulatorBuilderState(simulatorId);
@@ -42,7 +42,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { error: "Failed to load simulator builder state." },
+      { error: "No se pudo cargar el estado del constructor del simulador." },
       { status: 500 },
     );
   }
@@ -56,12 +56,12 @@ export async function POST(
     await requireAdmin();
     const { simulatorId } = await context.params;
     if (!simulatorId) {
-      return NextResponse.json({ error: "Invalid simulator id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
     if (!isObject(body) || typeof body.sourceQuestionId !== "string") {
-      return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminSimulatorBuilderAddQuestionRequest = {
@@ -95,8 +95,9 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to add question to draft version." },
+      { error: "No se pudo agregar la pregunta a la version borrador." },
       { status: 500 },
     );
   }
 }
+

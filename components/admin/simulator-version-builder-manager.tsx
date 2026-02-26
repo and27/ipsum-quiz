@@ -30,7 +30,7 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const message =
       typeof (payload as ApiErrorResponse).error === "string"
         ? (payload as ApiErrorResponse).error
-        : "Request failed.";
+        : "La solicitud fallo.";
     throw new Error(message);
   }
   return payload as T;
@@ -111,13 +111,13 @@ export function SimulatorVersionBuilderManager({
       });
       await parseApiResponse<{ item: SimulatorVersionQuestion }>(response);
       setNewQuestionPosition("");
-      setSuccessMessage("Question added to draft version.");
+      setSuccessMessage("Pregunta agregada a la version borrador.");
       await loadState();
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Failed to add question to draft version.",
+          : "No se pudo agregar la pregunta a la version borrador.",
       );
     } finally {
       setIsAdding(false);
@@ -140,11 +140,11 @@ export function SimulatorVersionBuilderManager({
         },
       );
       await parseApiResponse<{ item: SimulatorVersionQuestion }>(response);
-      setSuccessMessage("Draft question reordered.");
+      setSuccessMessage("Pregunta del borrador reordenada.");
       await loadState();
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to reorder draft question.",
+        error instanceof Error ? error.message : "No se pudo reordenar la pregunta del borrador.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [item.id]: false }));
@@ -152,7 +152,7 @@ export function SimulatorVersionBuilderManager({
   }
 
   async function handleDelete(item: SimulatorVersionQuestion) {
-    const confirmed = window.confirm("Remove this question from draft version?");
+    const confirmed = window.confirm("Quitar esta pregunta de la version borrador?");
     if (!confirmed) {
       return;
     }
@@ -168,13 +168,13 @@ export function SimulatorVersionBuilderManager({
         { method: "DELETE" },
       );
       await parseApiResponse<{ ok: true }>(response);
-      setSuccessMessage("Question removed from draft version.");
+      setSuccessMessage("Pregunta eliminada de la version borrador.");
       await loadState();
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Failed to remove question from draft version.",
+          : "No se pudo eliminar la pregunta de la version borrador.",
       );
     } finally {
       setRowBusy((prev) => ({ ...prev, [item.id]: false }));
@@ -195,13 +195,13 @@ export function SimulatorVersionBuilderManager({
         await parseApiResponse<AdminSimulatorPublishValidationResponse>(response);
       setValidationResult(payload.validation);
       if (payload.validation.isValid) {
-        setSuccessMessage("Draft version is valid for publish.");
+        setSuccessMessage("La version borrador es valida para publicar.");
       }
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Failed to validate draft version.",
+          : "No se pudo validar la version borrador.",
       );
     } finally {
       setIsValidating(false);
@@ -219,12 +219,12 @@ export function SimulatorVersionBuilderManager({
       const payload = await parseApiResponse<AdminSimulatorPublishResponse>(response);
       setValidationResult(payload.validation);
       setSuccessMessage(
-        `Draft version v${payload.publishedVersion.versionNumber} published successfully.`,
+        `Version borrador v${payload.publishedVersion.versionNumber} publicada correctamente.`,
       );
       await loadState();
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to publish draft version.",
+        error instanceof Error ? error.message : "No se pudo publicar la version borrador.",
       );
     } finally {
       setIsPublishing(false);
@@ -244,12 +244,12 @@ export function SimulatorVersionBuilderManager({
       const payload =
         await parseApiResponse<AdminSimulatorDuplicateVersionResponse>(response);
       setSuccessMessage(
-        `Draft v${payload.draftVersion.versionNumber} created with ${payload.copiedQuestions} copied questions.`,
+        `Borrador v${payload.draftVersion.versionNumber} creado con ${payload.copiedQuestions} preguntas copiadas.`,
       );
       await loadState();
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to duplicate version.",
+        error instanceof Error ? error.message : "No se pudo duplicar la version.",
       );
     } finally {
       setIsDuplicating(false);
@@ -261,7 +261,7 @@ export function SimulatorVersionBuilderManager({
       <Card>
         <CardHeader>
           <CardTitle>
-            Version Builder{" "}
+            Constructor de version{" "}
             {activeVersion ? `(v${activeVersion.versionNumber} - ${activeVersion.status})` : ""}
           </CardTitle>
         </CardHeader>
@@ -276,7 +276,7 @@ export function SimulatorVersionBuilderManager({
                   onClick={handleDuplicateVersion}
                   disabled={isDuplicating}
                 >
-                  {isDuplicating ? "Duplicating..." : "Duplicate published version"}
+                  {isDuplicating ? "Duplicando..." : "Duplicar version publicada"}
                 </Button>
               ) : null}
             </div>
@@ -284,7 +284,7 @@ export function SimulatorVersionBuilderManager({
           <form onSubmit={handleAddQuestion} className="space-y-3">
             <div className="space-y-1">
               <label htmlFor="builder-source-question" className="text-sm font-medium">
-                Question from bank
+                Pregunta del banco
               </label>
               <select
                 id="builder-source-question"
@@ -302,7 +302,7 @@ export function SimulatorVersionBuilderManager({
             </div>
             <div className="space-y-1">
               <label htmlFor="builder-position" className="text-sm font-medium">
-                Insert position (optional)
+                Posicion de insercion (opcional)
               </label>
               <Input
                 id="builder-position"
@@ -317,12 +317,12 @@ export function SimulatorVersionBuilderManager({
               type="submit"
               disabled={isAdding || availableToAdd.length === 0 || !isEditable}
             >
-              {isAdding ? "Adding..." : "Add question"}
+              {isAdding ? "Agregando..." : "Agregar pregunta"}
             </Button>
           </form>
           {availableToAdd.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No additional bank-ready active questions available to add.
+              No hay mas preguntas activas y listas para banco para agregar.
             </p>
           ) : null}
         </CardContent>
@@ -330,7 +330,7 @@ export function SimulatorVersionBuilderManager({
 
       <Card>
         <CardHeader>
-          <CardTitle>Draft Questions</CardTitle>
+          <CardTitle>Preguntas del borrador</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
@@ -374,7 +374,7 @@ export function SimulatorVersionBuilderManager({
                       }
                       onClick={() => handleReorder(item, nextPosition)}
                     >
-                      Move
+                      Mover
                     </Button>
                     <Button
                       type="button"
@@ -382,7 +382,7 @@ export function SimulatorVersionBuilderManager({
                       disabled={busy || !isEditable || index === 0}
                       onClick={() => handleReorder(item, item.position - 1)}
                     >
-                      Up
+                      Subir
                     </Button>
                     <Button
                       type="button"
@@ -390,7 +390,7 @@ export function SimulatorVersionBuilderManager({
                       disabled={busy || !isEditable || index === items.length - 1}
                       onClick={() => handleReorder(item, item.position + 1)}
                     >
-                      Down
+                      Bajar
                     </Button>
                     <Button
                       type="button"
@@ -398,7 +398,7 @@ export function SimulatorVersionBuilderManager({
                       disabled={busy || !isEditable}
                       onClick={() => handleDelete(item)}
                     >
-                      Remove
+                      Quitar
                     </Button>
                   </div>
                 </div>
@@ -407,7 +407,7 @@ export function SimulatorVersionBuilderManager({
           </div>
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Draft version has no questions yet.
+              La version borrador aun no tiene preguntas.
             </p>
           ) : null}
         </CardContent>
@@ -415,7 +415,7 @@ export function SimulatorVersionBuilderManager({
 
       <Card>
         <CardHeader>
-          <CardTitle>Publish Validation</CardTitle>
+          <CardTitle>Validacion de publicacion</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -424,19 +424,19 @@ export function SimulatorVersionBuilderManager({
               onClick={handleValidateBeforePublish}
               disabled={isValidating || isPublishing || !draftVersion}
             >
-              {isValidating ? "Validating..." : "Run validation"}
+              {isValidating ? "Validando..." : "Ejecutar validacion"}
             </Button>
             <Button
               type="button"
               onClick={handlePublishDraftVersion}
               disabled={isPublishing || isValidating || !draftVersion}
             >
-              {isPublishing ? "Publishing..." : "Publish draft version"}
+              {isPublishing ? "Publicando..." : "Publicar version borrador"}
             </Button>
           </div>
           {!draftVersion ? (
             <p className="text-xs text-muted-foreground">
-              No draft exists right now. Duplicate the published version to create one.
+              No existe un borrador en este momento. Duplica la version publicada para crear uno.
             </p>
           ) : null}
 
@@ -448,8 +448,8 @@ export function SimulatorVersionBuilderManager({
                 }`}
               >
                 {validationResult.isValid
-                  ? "Draft version is valid for publish."
-                  : "Draft version has validation issues."}
+                  ? "La version borrador es valida para publicar."
+                  : "La version borrador tiene problemas de validacion."}
               </p>
               {validationResult.issues.length > 0 ? (
                 <ul className="list-disc pl-5 text-sm">
@@ -467,3 +467,4 @@ export function SimulatorVersionBuilderManager({
     </div>
   );
 }
+

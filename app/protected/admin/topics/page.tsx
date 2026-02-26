@@ -20,9 +20,9 @@ async function AdminTopicsContent() {
   return (
     <div className="flex w-full flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin - Topics</h1>
+        <h1 className="text-2xl font-bold">Admin - Temas</h1>
         <p className="text-sm text-muted-foreground">
-          Create, rename, activate or deactivate topics.
+          Crea, renombra, activa o desactiva temas.
         </p>
       </div>
 
@@ -33,7 +33,7 @@ async function AdminTopicsContent() {
 
 export default function AdminTopicsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
       <AdminTopicsContent />
     </Suspense>
   );

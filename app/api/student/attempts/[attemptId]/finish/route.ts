@@ -14,7 +14,7 @@ export async function POST(
     const session = await requireStudent();
     const { attemptId } = await context.params;
     if (!attemptId) {
-      return NextResponse.json({ error: "Invalid attempt id." }, { status: 400 });
+      return NextResponse.json({ error: "ID de intento invalido." }, { status: 400 });
     }
 
     const result = await finishAttemptForStudent({
@@ -44,9 +44,10 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to finish attempt." },
+      { error: "No se pudo finalizar el intento." },
       { status: 500 },
     );
   }
 }
+
 
