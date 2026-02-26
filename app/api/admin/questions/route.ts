@@ -12,6 +12,11 @@ import {
   listQuestions,
   QuestionInputError,
 } from "@/lib/usecases/questions";
+import {
+  createQuestionOption,
+  QuestionOptionInputError,
+} from "@/lib/usecases/question-options";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -79,12 +84,65 @@ export async function POST(request: NextRequest) {
         typeof body.imageUrl === "string" || body.imageUrl === null
           ? body.imageUrl
           : undefined,
+      options: Array.isArray(body.options)
+        ? body.options
+            .filter((option): option is Record<string, unknown> => isObject(option))
+            .map((option) => ({
+              text: typeof option.text === "string" ? option.text : "",
+              isCorrect:
+                typeof option.isCorrect === "boolean" ? option.isCorrect : undefined,
+              isActive:
+                typeof option.isActive === "boolean" ? option.isActive : undefined,
+            }))
+        : undefined,
     };
+
+    if (payload.options && payload.options.length > 0) {
+      if (payload.options.length < 2) {
+        return NextResponse.json(
+          { error: "Debes crear al menos 2 opciones." },
+          { status: 400 },
+        );
+      }
+
+      const correctCount = payload.options.filter(
+        (option) => option.isCorrect === true,
+      ).length;
+
+      if (correctCount !== 1) {
+        return NextResponse.json(
+          { error: "Debes marcar exactamente 1 opcion correcta." },
+          { status: 400 },
+        );
+      }
+    }
 
     const question = await createQuestion({
       ...payload,
       createdBy: session.userId,
     });
+
+    if (payload.options && payload.options.length > 0) {
+      try {
+        for (const [index, option] of payload.options.entries()) {
+          await createQuestionOption(question.id, {
+            text: option.text,
+            isCorrect: option.isCorrect,
+            isActive: option.isActive,
+            position: index + 1,
+          });
+        }
+      } catch (error) {
+        const supabase = await createClient();
+        await supabase.from("questions").delete().eq("id", question.id);
+
+        if (error instanceof QuestionOptionInputError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+
+        throw error;
+      }
+    }
 
     return NextResponse.json({ question }, { status: 201 });
   } catch (error) {
@@ -103,6 +161,10 @@ export async function POST(request: NextRequest) {
       if (error.code === "topic_not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
+    }
+
+    if (error instanceof QuestionOptionInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json(

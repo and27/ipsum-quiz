@@ -12,6 +12,7 @@ import type {
   Topic,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
+import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,12 @@ import { useMemo, useState } from "react";
 interface QuestionsManagerProps {
   initialQuestions: AdminQuestionsListResponse;
   availableTopics: Topic[];
+}
+
+interface DraftOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
 }
 
 interface ApiErrorResponse {
@@ -82,6 +89,7 @@ export function QuestionsManager({
   const [questions, setQuestions] = useState<Question[]>(initialQuestions.items);
   const [meta, setMeta] = useState<PaginationMeta>(initialQuestions.meta);
   const [includeInactive, setIncludeInactive] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isUploadingCreateImage, setIsUploadingCreateImage] = useState(false);
@@ -93,6 +101,10 @@ export function QuestionsManager({
   const [newTopicId, setNewTopicId] = useState<string>(availableTopics[0]?.id ?? "");
   const [newStatement, setNewStatement] = useState("");
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [newOptions, setNewOptions] = useState<DraftOption[]>([
+    { id: crypto.randomUUID(), text: "", isCorrect: true },
+    { id: crypto.randomUUID(), text: "", isCorrect: false },
+  ]);
 
   const [editStatements, setEditStatements] = useState<Record<string, string>>(
     () => buildEditStatements(initialQuestions.items),
@@ -141,10 +153,31 @@ export function QuestionsManager({
     setSuccessMessage(null);
 
     try {
+      const nonEmptyOptions = newOptions
+        .map((option) => ({
+          ...option,
+          text: option.text.trim(),
+        }))
+        .filter((option) => option.text.length > 0);
+
+      if (nonEmptyOptions.length < 2) {
+        throw new Error("Debes agregar al menos 2 opciones con texto.");
+      }
+
+      const correctCount = nonEmptyOptions.filter((option) => option.isCorrect).length;
+      if (correctCount !== 1) {
+        throw new Error("Debes marcar exactamente 1 opcion correcta.");
+      }
+
       const payload: AdminQuestionCreateRequest = {
         topicId: newTopicId,
         statement: newStatement,
         imageUrl: newImageUrl || null,
+        options: nonEmptyOptions.map((option) => ({
+          text: option.text,
+          isCorrect: option.isCorrect,
+          isActive: true,
+        })),
       };
       const response = await fetch("/api/admin/questions", {
         method: "POST",
@@ -155,6 +188,11 @@ export function QuestionsManager({
       await parseApiResponse<AdminQuestionResponse>(response);
       setNewStatement("");
       setNewImageUrl("");
+      setNewOptions([
+        { id: crypto.randomUUID(), text: "", isCorrect: true },
+        { id: crypto.randomUUID(), text: "", isCorrect: false },
+      ]);
+      setIsCreateModalOpen(false);
       setSuccessMessage("Pregunta creada.");
       await loadQuestions(1, includeInactive);
     } catch (error: unknown) {
@@ -181,6 +219,32 @@ export function QuestionsManager({
     } finally {
       setIsUploadingCreateImage(false);
     }
+  }
+
+  function addDraftOption() {
+    setNewOptions((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), text: "", isCorrect: false },
+    ]);
+  }
+
+  function removeDraftOption(id: string) {
+    setNewOptions((prev) => {
+      if (prev.length <= 2) {
+        return prev;
+      }
+      const next = prev.filter((option) => option.id !== id);
+      if (!next.some((option) => option.isCorrect) && next.length > 0) {
+        next[0] = { ...next[0], isCorrect: true };
+      }
+      return next;
+    });
+  }
+
+  function setDraftOptionCorrect(id: string) {
+    setNewOptions((prev) =>
+      prev.map((option) => ({ ...option, isCorrect: option.id === id })),
+    );
   }
 
   async function handleRowImageUpload(questionId: string, file: File) {
@@ -231,20 +295,26 @@ export function QuestionsManager({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear pregunta</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex justify-end">
+        <BaseModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          title="Crear pregunta"
+          trigger={<Button type="button">Crear pregunta</Button>}
+        >
           <form onSubmit={handleCreateQuestion} className="space-y-3">
             <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
               value={newTopicId}
               onChange={(event) => setNewTopicId(event.target.value)}
               disabled={isCreating || !hasTopics}
             >
               {availableTopics.map((topic) => (
-                <option key={topic.id} value={topic.id}>
+                <option
+                  key={topic.id}
+                  value={topic.id}
+                  className="bg-background text-foreground"
+                >
                   {topic.name}
                 </option>
               ))}
@@ -290,6 +360,56 @@ export function QuestionsManager({
               </p>
             ) : null}
 
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Opciones</p>
+                <Button type="button" variant="outline" size="sm" onClick={addDraftOption}>
+                  Agregar opcion
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {newOptions.map((option, index) => (
+                  <div key={option.id} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="new-question-correct-option"
+                      checked={option.isCorrect}
+                      onChange={() => setDraftOptionCorrect(option.id)}
+                      disabled={isCreating}
+                      aria-label={`Marcar opcion ${index + 1} como correcta`}
+                    />
+                    <Input
+                      placeholder={`Texto de opcion ${index + 1}`}
+                      value={option.text}
+                      onChange={(event) =>
+                        setNewOptions((prev) =>
+                          prev.map((item) =>
+                            item.id === option.id
+                              ? { ...item, text: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      disabled={isCreating}
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeDraftOption(option.id)}
+                      disabled={isCreating || newOptions.length <= 2}
+                    >
+                      Quitar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Debes crear al menos 2 opciones y marcar 1 como correcta.
+              </p>
+            </div>
+
             <Button type="submit" disabled={isCreating || !hasTopics}>
               {isCreating ? "Creando..." : "Crear pregunta"}
             </Button>
@@ -299,8 +419,8 @@ export function QuestionsManager({
               </p>
             ) : null}
           </form>
-        </CardContent>
-      </Card>
+        </BaseModal>
+      </div>
 
       <Card>
         <CardHeader>
@@ -365,7 +485,7 @@ export function QuestionsManager({
                   </p>
 
                   <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
                     value={editedTopicId}
                     onChange={(event) =>
                       setEditTopicIds((prev) => ({
@@ -376,7 +496,11 @@ export function QuestionsManager({
                     disabled={busy || uploadingImage}
                   >
                     {availableTopics.map((topic) => (
-                      <option key={topic.id} value={topic.id}>
+                      <option
+                        key={topic.id}
+                        value={topic.id}
+                        className="bg-background text-foreground"
+                      >
                         {topic.name}
                       </option>
                     ))}

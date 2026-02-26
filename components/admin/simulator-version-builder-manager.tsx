@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface SimulatorVersionBuilderManagerProps {
   simulatorId: string;
@@ -54,9 +54,7 @@ export function SimulatorVersionBuilderManager({
   const [editPositions, setEditPositions] = useState<Record<string, string>>(
     () => buildEditPositions(initialState.items),
   );
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string>(
-    availableQuestions[0]?.id ?? "",
-  );
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
   const [newQuestionPosition, setNewQuestionPosition] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -77,6 +75,22 @@ export function SimulatorVersionBuilderManager({
       (question) => question.isBankReady && !existingSourceQuestionIds.has(question.id),
     );
   }, [availableQuestions, items]);
+
+  useEffect(() => {
+    if (availableToAdd.length === 0) {
+      if (selectedQuestionId) {
+        setSelectedQuestionId("");
+      }
+      return;
+    }
+
+    const stillAvailable = availableToAdd.some(
+      (question) => question.id === selectedQuestionId,
+    );
+    if (!stillAvailable) {
+      setSelectedQuestionId(availableToAdd[0].id);
+    }
+  }, [availableToAdd, selectedQuestionId]);
 
   async function loadState() {
     const response = await fetch(`/api/admin/simulators/${simulatorId}/builder`, {
@@ -101,6 +115,18 @@ export function SimulatorVersionBuilderManager({
     setValidationResult(null);
 
     try {
+      if (!selectedQuestionId) {
+        throw new Error("Selecciona una pregunta disponible del banco.");
+      }
+      const isSelectable = availableToAdd.some(
+        (question) => question.id === selectedQuestionId,
+      );
+      if (!isSelectable) {
+        throw new Error(
+          "La pregunta seleccionada ya no esta disponible. Intenta nuevamente.",
+        );
+      }
+
       const response = await fetch(`/api/admin/simulators/${simulatorId}/builder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +140,13 @@ export function SimulatorVersionBuilderManager({
       setSuccessMessage("Pregunta agregada a la version borrador.");
       await loadState();
     } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("ya esta agregada") ||
+          error.message.includes("already added"))
+      ) {
+        await loadState();
+      }
       setErrorMessage(
         error instanceof Error
           ? error.message
@@ -262,7 +295,15 @@ export function SimulatorVersionBuilderManager({
         <CardHeader>
           <CardTitle>
             Constructor de version{" "}
-            {activeVersion ? `(v${activeVersion.versionNumber} - ${activeVersion.status})` : ""}
+            {activeVersion
+              ? `(v${activeVersion.versionNumber} - ${
+                  activeVersion.status === "draft"
+                    ? "borrador"
+                    : activeVersion.status === "published"
+                      ? "publicada"
+                      : "archivada"
+                })`
+              : ""}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -288,13 +329,18 @@ export function SimulatorVersionBuilderManager({
               </label>
               <select
                 id="builder-source-question"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
                 value={selectedQuestionId}
                 onChange={(event) => setSelectedQuestionId(event.target.value)}
                 disabled={isAdding || availableToAdd.length === 0 || !isEditable}
               >
                 {availableToAdd.map((question) => (
-                  <option key={question.id} value={question.id}>
+                  <option
+                    key={question.id}
+                    value={question.id}
+                    className="text-black"
+                    style={{ backgroundColor: "#ffffff", color: "#111111" }}
+                  >
                     {question.topicName} - {question.statement}
                   </option>
                 ))}

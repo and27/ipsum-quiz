@@ -1,7 +1,8 @@
 import { getCurrentSessionContext } from "@/lib/usecases/auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function HomePage() {
+async function HomePageContent() {
   const session = await getCurrentSessionContext();
 
   if (!session.userId) {
@@ -17,5 +18,13 @@ export default async function HomePage() {
   }
 
   redirect("/auth/login");
+  return null;
 }
 
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageContent />
+    </Suspense>
+  );
+}

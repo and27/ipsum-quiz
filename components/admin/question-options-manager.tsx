@@ -1,8 +1,6 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
 
 import type {
-  AdminImageUploadResponse,
   AdminQuestionOptionCreateRequest,
   AdminQuestionOptionResponse,
   AdminQuestionOptionsListResponse,
@@ -11,10 +9,10 @@ import type {
   QuestionOptionIntegrity,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
+import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { prepareImageForUpload } from "@/lib/usecases/images/client";
 import { useMemo, useState } from "react";
 
 interface QuestionOptionsManagerProps {
@@ -44,35 +42,10 @@ function buildEditText(options: QuestionOption[]): Record<string, string> {
   return Object.fromEntries(options.map((option) => [option.id, option.text]));
 }
 
-function buildEditImageUrl(options: QuestionOption[]): Record<string, string> {
-  return Object.fromEntries(
-    options.map((option) => [option.id, option.imageUrl ?? ""]),
-  );
-}
-
 function buildEditPosition(options: QuestionOption[]): Record<string, string> {
   return Object.fromEntries(
     options.map((option) => [option.id, String(option.position)]),
   );
-}
-
-async function uploadAdminImage(
-  entityType: "question" | "option",
-  file: File,
-): Promise<string> {
-  const prepared = await prepareImageForUpload(file);
-  const formData = new FormData();
-  formData.set("entityType", entityType);
-  formData.set("original", prepared.originalFile);
-  formData.set("processedWebp", prepared.processedWebpFile);
-  formData.set("processedJpeg", prepared.processedJpegFile);
-
-  const response = await fetch("/api/admin/images/upload", {
-    method: "POST",
-    body: formData,
-  });
-  const payload = await parseApiResponse<AdminImageUploadResponse>(response);
-  return payload.asset.finalUrl;
 }
 
 export function QuestionOptionsManager({
@@ -85,24 +58,19 @@ export function QuestionOptionsManager({
   const [integrity, setIntegrity] = useState<QuestionOptionIntegrity>(initialIntegrity);
   const [questionIsActive, setQuestionIsActive] = useState(initialQuestionIsActive);
   const [includeInactive, setIncludeInactive] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [isUploadingCreateImage, setIsUploadingCreateImage] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
-  const [rowImageBusy, setRowImageBusy] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [newText, setNewText] = useState("");
-  const [newImageUrl, setNewImageUrl] = useState("");
   const [newPosition, setNewPosition] = useState("");
   const [newIsCorrect, setNewIsCorrect] = useState(false);
 
   const [editText, setEditText] = useState<Record<string, string>>(
     () => buildEditText(initialOptions),
-  );
-  const [editImageUrl, setEditImageUrl] = useState<Record<string, string>>(
-    () => buildEditImageUrl(initialOptions),
   );
   const [editPosition, setEditPosition] = useState<Record<string, string>>(
     () => buildEditPosition(initialOptions),
@@ -125,7 +93,6 @@ export function QuestionOptionsManager({
       setIntegrity(payload.integrity);
       setQuestionIsActive(payload.questionIsActive);
       setEditText(buildEditText(payload.items));
-      setEditImageUrl(buildEditImageUrl(payload.items));
       setEditPosition(buildEditPosition(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
@@ -133,43 +100,6 @@ export function QuestionOptionsManager({
       );
     } finally {
       setIsLoadingList(false);
-    }
-  }
-
-  async function handleCreateImageUpload(file: File) {
-    setIsUploadingCreateImage(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      const imageUrl = await uploadAdminImage("option", file);
-      setNewImageUrl(imageUrl);
-      setSuccessMessage("Imagen subida para la nueva opcion.");
-    } catch (error: unknown) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo subir la imagen.",
-      );
-    } finally {
-      setIsUploadingCreateImage(false);
-    }
-  }
-
-  async function handleRowImageUpload(optionId: string, file: File) {
-    setRowImageBusy((prev) => ({ ...prev, [optionId]: true }));
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      const imageUrl = await uploadAdminImage("option", file);
-      setEditImageUrl((prev) => ({
-        ...prev,
-        [optionId]: imageUrl,
-      }));
-      setSuccessMessage("Imagen subida.");
-    } catch (error: unknown) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo subir la imagen.",
-      );
-    } finally {
-      setRowImageBusy((prev) => ({ ...prev, [optionId]: false }));
     }
   }
 
@@ -182,7 +112,6 @@ export function QuestionOptionsManager({
     try {
       const payload: AdminQuestionOptionCreateRequest = {
         text: newText,
-        imageUrl: newImageUrl || null,
         position: newPosition ? Number(newPosition) : undefined,
         isCorrect: newIsCorrect,
       };
@@ -195,9 +124,9 @@ export function QuestionOptionsManager({
       await parseApiResponse<AdminQuestionOptionResponse>(response);
 
       setNewText("");
-      setNewImageUrl("");
       setNewPosition("");
       setNewIsCorrect(false);
+      setIsCreateModalOpen(false);
       setSuccessMessage("Opcion creada.");
       await loadOptions(includeInactive);
     } catch (error: unknown) {
@@ -267,11 +196,13 @@ export function QuestionOptionsManager({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear opcion</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex justify-end">
+        <BaseModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          title="Crear opcion"
+          trigger={<Button type="button">Crear opcion</Button>}
+        >
           <form onSubmit={handleCreateOption} className="space-y-3">
             <Input
               placeholder="Texto de la opcion"
@@ -279,37 +210,6 @@ export function QuestionOptionsManager({
               onChange={(event) => setNewText(event.target.value)}
               disabled={isCreating}
             />
-            <Input
-              placeholder="URL de imagen (opcional)"
-              value={newImageUrl}
-              onChange={(event) => setNewImageUrl(event.target.value)}
-              disabled={isCreating || isUploadingCreateImage}
-            />
-            {newImageUrl ? (
-              <img
-                src={newImageUrl}
-                alt="Vista previa de la opcion"
-                className="max-h-40 rounded border object-contain"
-              />
-            ) : null}
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={isCreating || isUploadingCreateImage}
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) {
-                  return;
-                }
-                await handleCreateImageUpload(file);
-              }}
-            />
-            {isUploadingCreateImage ? (
-              <p className="text-xs text-muted-foreground">
-                Procesando y subiendo imagen...
-              </p>
-            ) : null}
             <Input
               type="number"
               min={1}
@@ -331,8 +231,8 @@ export function QuestionOptionsManager({
               {isCreating ? "Creando..." : "Crear opcion"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </BaseModal>
+      </div>
 
       <Card>
         <CardHeader>
@@ -381,13 +281,10 @@ export function QuestionOptionsManager({
           <div className="space-y-3">
             {options.map((option) => {
               const busy = !!rowBusy[option.id];
-              const uploadingImage = !!rowImageBusy[option.id];
               const text = editText[option.id] ?? option.text;
-              const imageUrl = editImageUrl[option.id] ?? option.imageUrl ?? "";
               const position = editPosition[option.id] ?? String(option.position);
               const hasChanges =
                 text.trim() !== option.text ||
-                (imageUrl || null) !== option.imageUrl ||
                 Number(position) !== option.position;
 
               return (
@@ -406,45 +303,8 @@ export function QuestionOptionsManager({
                     onChange={(event) =>
                       setEditText((prev) => ({ ...prev, [option.id]: event.target.value }))
                     }
-                    disabled={busy || uploadingImage}
+                    disabled={busy}
                   />
-
-                  <Input
-                    value={imageUrl}
-                    placeholder="URL de imagen (opcional)"
-                    onChange={(event) =>
-                      setEditImageUrl((prev) => ({
-                        ...prev,
-                        [option.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy || uploadingImage}
-                  />
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt="Vista previa de la opcion"
-                      className="max-h-40 rounded border object-contain"
-                    />
-                  ) : null}
-                  <Input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={busy || uploadingImage}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (!file) {
-                        return;
-                      }
-                      await handleRowImageUpload(option.id, file);
-                    }}
-                  />
-                  {uploadingImage ? (
-                    <p className="text-xs text-muted-foreground">
-                      Procesando y subiendo imagen...
-                    </p>
-                  ) : null}
 
                   <Input
                     type="number"
@@ -456,18 +316,17 @@ export function QuestionOptionsManager({
                         [option.id]: event.target.value,
                       }))
                     }
-                    disabled={busy || uploadingImage}
+                    disabled={busy}
                   />
 
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || uploadingImage || !hasChanges}
+                      disabled={busy || !hasChanges}
                       onClick={() =>
                         handleUpdateOption(option, {
                           text,
-                          imageUrl: imageUrl || null,
                           position: Number(position),
                         })
                       }
@@ -477,7 +336,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant={option.isCorrect ? "secondary" : "default"}
-                      disabled={busy || uploadingImage || option.isCorrect}
+                      disabled={busy || option.isCorrect}
                       onClick={() => handleUpdateOption(option, { isCorrect: true })}
                     >
                       {option.isCorrect ? "Correcta actual" : "Definir correcta"}
@@ -485,7 +344,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant={option.isActive ? "secondary" : "default"}
-                      disabled={busy || uploadingImage}
+                      disabled={busy}
                       onClick={() =>
                         handleUpdateOption(option, { isActive: !option.isActive })
                       }
@@ -495,7 +354,7 @@ export function QuestionOptionsManager({
                     <Button
                       type="button"
                       variant="destructive"
-                      disabled={busy || uploadingImage}
+                      disabled={busy}
                       onClick={() => handleDeleteOption(option)}
                     >
                       Eliminar

@@ -8,6 +8,7 @@ import type {
   Topic,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
+import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
   );
   const [newTopicName, setNewTopicName] = useState("");
   const [includeInactive, setIncludeInactive] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -96,6 +98,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
       });
       await parseApiResponse<AdminTopicResponse>(response);
       setNewTopicName("");
+      setIsCreateModalOpen(false);
       setSuccessMessage("Tema creado.");
       await loadTopics(includeInactive);
     } catch (error: unknown) {
@@ -130,11 +133,13 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear tema</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex justify-end">
+        <BaseModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          title="Crear tema"
+          trigger={<Button type="button">Crear tema</Button>}
+        >
           <form onSubmit={handleCreateTopic} className="flex flex-col gap-3 sm:flex-row">
             <Input
               placeholder="e.g. Matematicas"
@@ -146,8 +151,8 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
               {isCreating ? "Creando..." : "Crear"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </BaseModal>
+      </div>
 
       <Card>
         <CardHeader>

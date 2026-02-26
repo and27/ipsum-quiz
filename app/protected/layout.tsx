@@ -5,7 +5,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-export default async function ProtectedLayout({
+function ProtectedLayoutFallback() {
+  return (
+    <main className="min-h-screen">
+      <div className="mx-auto w-full max-w-6xl p-5">
+        <p className="text-sm text-muted-foreground">Cargando...</p>
+      </div>
+    </main>
+  );
+}
+
+async function ProtectedLayoutContent({
   children,
 }: {
   children: React.ReactNode;
@@ -44,5 +54,17 @@ export default async function ProtectedLayout({
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={<ProtectedLayoutFallback />}>
+      <ProtectedLayoutContent>{children}</ProtectedLayoutContent>
+    </Suspense>
   );
 }

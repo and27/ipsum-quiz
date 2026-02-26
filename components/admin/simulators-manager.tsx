@@ -9,6 +9,7 @@ import type {
   Simulator,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
+import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ export function SimulatorsManager({
   const [simulators, setSimulators] = useState<Simulator[]>(initialSimulators.items);
   const [meta, setMeta] = useState<PaginationMeta>(initialSimulators.meta);
   const [includeInactive, setIncludeInactive] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -148,6 +150,7 @@ export function SimulatorsManager({
       setNewDurationMinutes("60");
       setNewMaxAttempts("3");
       setNewAccessCode("");
+      setIsCreateModalOpen(false);
       setSuccessMessage("Simulador creado.");
       await loadSimulators(1, includeInactive);
     } catch (error: unknown) {
@@ -187,11 +190,13 @@ export function SimulatorsManager({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear simulador</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex justify-end">
+        <BaseModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          title="Crear simulador"
+          trigger={<Button type="button">Crear simulador</Button>}
+        >
           <form onSubmit={handleCreateSimulator} className="space-y-3">
             <div className="space-y-1">
               <label htmlFor="new-simulator-title" className="text-sm font-medium">
@@ -266,8 +271,8 @@ export function SimulatorsManager({
               {isCreating ? "Creando..." : "Crear simulador"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </BaseModal>
+      </div>
 
       <Card>
         <CardHeader>

@@ -13,6 +13,11 @@ export interface AdminQuestionCreateRequest {
   topicId: string;
   statement: string;
   imageUrl?: string | null;
+  options?: Array<{
+    text: string;
+    isCorrect?: boolean;
+    isActive?: boolean;
+  }>;
 }
 
 export interface AdminQuestionUpdateRequest {
@@ -25,4 +30,3 @@ export interface AdminQuestionUpdateRequest {
 export interface AdminQuestionResponse {
   question: Question;
 }
-

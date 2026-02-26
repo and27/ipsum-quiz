@@ -209,7 +209,7 @@ async function getSimulatorById(simulatorId: string): Promise<Simulator> {
   if (!simulator) {
     throw new SimulatorBuilderError(
       "simulator_not_found",
-      "Simulator was not found.",
+      "No se encontro el simulador.",
     );
   }
 
@@ -429,7 +429,7 @@ async function assertSourceQuestionEligible(sourceQuestionId: string): Promise<{
   ) {
     throw new SimulatorBuilderError(
       "question_not_found",
-      "Question was not found or is inactive.",
+      "La pregunta no existe o esta inactiva.",
     );
   }
 
@@ -449,7 +449,7 @@ async function assertSourceQuestionEligible(sourceQuestionId: string): Promise<{
   if (activeOptions.length < 2 || activeCorrectCount !== 1) {
     throw new SimulatorBuilderError(
       "question_not_eligible",
-      "Question must have at least 2 active options and exactly 1 active correct option.",
+      "La pregunta debe tener al menos 2 opciones activas y exactamente 1 opcion correcta activa.",
     );
   }
 
@@ -493,7 +493,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   const isEditable = !activeVersion.hasAttempts;
   const lockReason = isEditable
     ? null
-    : "This version is locked because it already has student attempts. Duplicate it to continue editing.";
+    : "Esta version esta bloqueada porque ya tiene intentos de estudiantes. Duplicala para seguir editando.";
 
   return {
     simulator,
@@ -514,7 +514,7 @@ async function getEditableVersionForMutations(
     if (draftVersion.hasAttempts) {
       throw new SimulatorBuilderError(
         "version_locked",
-        "This draft version is locked because it already has student attempts.",
+        "Esta version borrador esta bloqueada porque ya tiene intentos de estudiantes.",
       );
     }
     return draftVersion;
@@ -525,7 +525,7 @@ async function getEditableVersionForMutations(
     if (publishedVersion.hasAttempts) {
       throw new SimulatorBuilderError(
         "version_locked",
-        "Published version has attempts. Duplicate this version to create a new editable draft.",
+        "La version publicada tiene intentos. Duplica esta version para crear un nuevo borrador editable.",
       );
     }
     return publishedVersion;
@@ -559,7 +559,7 @@ export async function addQuestionToDraftVersion(
   if (duplicate?.id) {
     throw new SimulatorBuilderError(
       "duplicate_question",
-      "Question is already added to this draft version.",
+      "La pregunta ya esta agregada en esta version borrador.",
     );
   }
 
@@ -633,7 +633,7 @@ export async function addQuestionToDraftVersion(
     if (!Number.isFinite(requestedPosition) || normalizedPosition <= 0) {
       throw new SimulatorBuilderError(
         "invalid_position",
-        "Position must be greater than 0.",
+        "La posicion debe ser mayor que 0.",
       );
     }
 
@@ -653,7 +653,7 @@ export async function addQuestionToDraftVersion(
   const finalItems = await listVersionQuestions(editableVersion.id);
   const created = finalItems.find((item) => item.id === versionQuestionId);
   if (!created) {
-    throw new Error("Failed to load created version question.");
+    throw new Error("No se pudo cargar la pregunta creada en la version.");
   }
 
   return created;
@@ -670,7 +670,7 @@ export async function reorderDraftVersionQuestion(
   if (!Number.isFinite(position) || Math.trunc(position) <= 0) {
     throw new SimulatorBuilderError(
       "invalid_position",
-      "Position must be greater than 0.",
+      "La posicion debe ser mayor que 0.",
     );
   }
 
@@ -678,7 +678,7 @@ export async function reorderDraftVersionQuestion(
   const ids = items.map((item) => item.id);
   const fromIndex = ids.indexOf(versionQuestionId);
   if (fromIndex === -1) {
-    throw new SimulatorBuilderError("not_found", "Draft question was not found.");
+    throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
   }
 
   ids.splice(fromIndex, 1);
@@ -690,7 +690,7 @@ export async function reorderDraftVersionQuestion(
   const finalItems = await listVersionQuestions(editableVersion.id);
   const updated = finalItems.find((item) => item.id === versionQuestionId);
   if (!updated) {
-    throw new SimulatorBuilderError("not_found", "Draft question was not found.");
+    throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
   }
 
   return updated;
@@ -716,7 +716,7 @@ export async function removeQuestionFromDraftVersion(
     throw new Error(deleteError.message);
   }
   if (!deletedRow) {
-    throw new SimulatorBuilderError("not_found", "Draft question was not found.");
+    throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
   }
 
   await normalizeVersionQuestionPositions(editableVersion.id);
@@ -731,7 +731,7 @@ function validateOrderContiguous(
     if (items[index].position !== expectedPosition) {
       issues.push({
         code: "order_not_contiguous",
-        message: `Question order is invalid at position ${expectedPosition}.`,
+        message: `El orden de preguntas es invalido en la posicion ${expectedPosition}.`,
         versionQuestionId: items[index].id,
         sourceQuestionId: items[index].sourceQuestionId ?? undefined,
       });
@@ -749,7 +749,7 @@ export async function validateDraftVersionBeforePublish(
   if (!draftVersion) {
     throw new SimulatorBuilderError(
       "draft_not_found",
-      "No draft version found to validate.",
+      "No se encontro una version borrador para validar.",
     );
   }
   const items = await listVersionQuestions(draftVersion.id);
@@ -758,7 +758,7 @@ export async function validateDraftVersionBeforePublish(
   if (items.length === 0) {
     issues.push({
       code: "empty_question_set",
-      message: "Draft version must include at least one question.",
+      message: "La version borrador debe incluir al menos una pregunta.",
     });
   }
 
@@ -781,7 +781,7 @@ export async function validateDraftVersionBeforePublish(
     if (optionCount < 2) {
       issues.push({
         code: "question_options_insufficient",
-        message: "Each draft question must have at least 2 options.",
+        message: "Cada pregunta del borrador debe tener al menos 2 opciones.",
         versionQuestionId: item.id,
         sourceQuestionId: item.sourceQuestionId ?? undefined,
       });
@@ -790,7 +790,7 @@ export async function validateDraftVersionBeforePublish(
     if (correctCount !== 1) {
       issues.push({
         code: "question_options_correct_count_invalid",
-        message: "Each draft question must have exactly one correct option.",
+        message: "Cada pregunta del borrador debe tener exactamente una opcion correcta.",
         versionQuestionId: item.id,
         sourceQuestionId: item.sourceQuestionId ?? undefined,
       });
@@ -815,7 +815,7 @@ export async function publishDraftVersion(simulatorId: string): Promise<{
   if (!draftVersion) {
     throw new SimulatorBuilderError(
       "draft_not_found",
-      "No draft version found to publish.",
+      "No se encontro una version borrador para publicar.",
     );
   }
 
@@ -823,7 +823,7 @@ export async function publishDraftVersion(simulatorId: string): Promise<{
   if (!validation.isValid) {
     throw new SimulatorBuilderError(
       "publish_validation_failed",
-      "Draft version is not valid for publish.",
+      "La version borrador no es valida para publicar.",
     );
   }
 
@@ -857,7 +857,7 @@ export async function publishDraftVersion(simulatorId: string): Promise<{
   if (!publishedVersion) {
     throw new SimulatorBuilderError(
       "version_not_found",
-      "Draft version was not found.",
+      "No se encontro la version borrador.",
     );
   }
 
@@ -898,7 +898,7 @@ export async function duplicatePublishedVersionToDraft(simulatorId: string): Pro
   if (existingDraft) {
     throw new SimulatorBuilderError(
       "draft_already_exists",
-      "There is already an editable draft for this simulator.",
+      "Ya existe un borrador editable para este simulador.",
     );
   }
 
@@ -906,7 +906,7 @@ export async function duplicatePublishedVersionToDraft(simulatorId: string): Pro
   if (!sourceVersion) {
     throw new SimulatorBuilderError(
       "published_version_not_found",
-      "No published version was found to duplicate.",
+      "No se encontro una version publicada para duplicar.",
     );
   }
 
@@ -948,7 +948,7 @@ export async function duplicatePublishedVersionToDraft(simulatorId: string): Pro
 
   const draftVersion = parseVersionRow(draftRow as RawVersionRow);
   if (!draftVersion) {
-    throw new Error("Invalid draft version payload returned from database.");
+    throw new Error("Payload de version borrador invalido devuelto por la base de datos.");
   }
 
   const sourceQuestions = await listVersionQuestions(sourceVersion.id);

@@ -89,7 +89,10 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 409 });
       }
       if (error.code === "duplicate_question") {
-        return NextResponse.json({ error: error.message }, { status: 409 });
+        return NextResponse.json(
+          { error: "La pregunta ya esta agregada en esta version borrador." },
+          { status: 409 },
+        );
       }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -1,7 +1,8 @@
 import { getCurrentSessionContext } from "@/lib/usecases/auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function ProtectedPage() {
+async function ProtectedPageContent() {
   const session = await getCurrentSessionContext();
 
   if (!session.userId) {
@@ -17,5 +18,13 @@ export default async function ProtectedPage() {
   }
 
   redirect("/auth/login");
+  return null;
 }
 
+export default function ProtectedPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProtectedPageContent />
+    </Suspense>
+  );
+}
