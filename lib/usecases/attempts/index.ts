@@ -1,8 +1,10 @@
 export {
   expireDueAttempts,
   finishAttemptForStudent,
+  getAttemptResultForStudent,
   getAttemptExamStateForStudent,
   getActiveAttemptForStudent,
+  listAttemptHistoryForStudent,
   saveAttemptAnswerForStudent,
   startOrResumeAttemptForStudent,
   StudentAccessError,

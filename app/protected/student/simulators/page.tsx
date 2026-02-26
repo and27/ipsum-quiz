@@ -1,6 +1,7 @@
 import { StudentSimulatorCatalog } from "@/components/student/simulator-catalog";
 import { AuthGuardError, requireStudent } from "@/lib/usecases/auth";
 import { listVisibleSimulatorsForStudent } from "@/lib/usecases/simulators";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -26,6 +27,9 @@ async function StudentSimulatorsContent() {
         <p className="text-sm text-muted-foreground">
           Only published and active simulators are visible here.
         </p>
+        <Link className="mt-1 inline-block text-sm underline" href="/protected/student/attempts">
+          Ver historial de intentos
+        </Link>
       </div>
 
       <StudentSimulatorCatalog simulators={simulators.items} />

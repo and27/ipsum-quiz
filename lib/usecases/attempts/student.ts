@@ -1,6 +1,8 @@
 import type {
   FinishAttemptResponse,
   SaveAttemptAnswerResponse,
+  StudentAttemptHistoryResponse,
+  StudentAttemptResultResponse,
   StudentExamQuestion,
   StudentExamQuestionOption,
   StudentExamStateResponse,
@@ -53,6 +55,26 @@ interface RawAttemptRow {
   started_at: string;
   expires_at: string;
   questions_total: number;
+}
+
+interface RawAttemptSummaryRow {
+  id: string;
+  simulator_id: string;
+  simulator_version_id: string;
+  student_id: string;
+  status: "active" | "finished" | "expired";
+  started_at: string;
+  expires_at: string;
+  finished_at: string | null;
+  score_total: number | null;
+  questions_total: number;
+}
+
+interface RawAttemptTopicScoreRow {
+  topic_id: string;
+  correct_count: number;
+  total_count: number;
+  topics: { name?: unknown } | Array<{ name?: unknown }> | null;
 }
 
 interface RawAnswerRow {
@@ -122,6 +144,42 @@ function parseStartOrResumeRow(row: unknown): StartAttemptResponse | null {
     expiresAt: value.expires_at,
     questionsTotal: value.questions_total,
     simulatorVersionId: value.simulator_version_id,
+  };
+}
+
+function parseAttemptSummaryRow(row: unknown) {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+  const value = row as RawAttemptSummaryRow;
+  if (
+    typeof value.id !== "string" ||
+    typeof value.simulator_id !== "string" ||
+    typeof value.simulator_version_id !== "string" ||
+    typeof value.student_id !== "string" ||
+    (value.status !== "active" &&
+      value.status !== "finished" &&
+      value.status !== "expired") ||
+    typeof value.started_at !== "string" ||
+    typeof value.expires_at !== "string" ||
+    (value.finished_at !== null && typeof value.finished_at !== "string") ||
+    (value.score_total !== null && typeof value.score_total !== "number") ||
+    typeof value.questions_total !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    simulatorId: value.simulator_id,
+    simulatorVersionId: value.simulator_version_id,
+    studentId: value.student_id,
+    status: value.status,
+    startedAt: value.started_at,
+    expiresAt: value.expires_at,
+    finishedAt: value.finished_at,
+    scoreTotal: value.score_total,
+    questionsTotal: value.questions_total,
   };
 }
 
@@ -218,6 +276,20 @@ function parseExamQuestionRows(rows: unknown[]): StudentExamQuestion[] {
         .sort((a, b) => a.position - b.position),
     }))
     .sort((a, b) => a.position - b.position);
+}
+
+function parsePage(value?: number): number {
+  if (!value || Number.isNaN(value)) {
+    return 1;
+  }
+  return Math.max(1, Math.trunc(value));
+}
+
+function parsePageSize(value?: number): number {
+  if (!value || Number.isNaN(value)) {
+    return 20;
+  }
+  return Math.max(1, Math.min(100, Math.trunc(value)));
 }
 
 function mapStartRpcError(errorMessage: string): StudentAttemptError {
@@ -779,6 +851,105 @@ export async function expireDueAttempts(input?: {
     scannedCount: attemptIds.length,
     expiredCount,
     attemptIds,
+  };
+}
+
+export async function listAttemptHistoryForStudent(input: {
+  studentId: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<StudentAttemptHistoryResponse> {
+  const page = parsePage(input.page);
+  const pageSize = parsePageSize(input.pageSize);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const supabase = await createClient();
+
+  const { data, error, count } = await supabase
+    .from("attempts")
+    .select(
+      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, questions_total",
+      { count: "exact" },
+    )
+    .eq("student_id", input.studentId)
+    .in("status", ["finished", "expired"])
+    .order("started_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const items = ((data ?? []) as unknown[])
+    .map((row) => parseAttemptSummaryRow(row))
+    .filter((row): row is NonNullable<ReturnType<typeof parseAttemptSummaryRow>> => !!row);
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    items,
+    meta: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
+}
+
+export async function getAttemptResultForStudent(input: {
+  studentId: string;
+  attemptId: string;
+}): Promise<StudentAttemptResultResponse> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("attempts")
+    .select(
+      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, questions_total",
+    )
+    .eq("id", input.attemptId)
+    .eq("student_id", input.studentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  const attempt = parseAttemptSummaryRow(data);
+  if (!attempt || (attempt.status !== "finished" && attempt.status !== "expired")) {
+    throw new StudentAttemptError(
+      "attempt_not_found",
+      "Attempt result was not found.",
+    );
+  }
+
+  const { data: topicRows, error: topicError } = await supabase
+    .from("attempt_topic_scores")
+    .select("topic_id, correct_count, total_count, topics(name)")
+    .eq("attempt_id", input.attemptId);
+
+  if (topicError) {
+    throw new Error(topicError.message);
+  }
+
+  const topicScores = ((topicRows ?? []) as RawAttemptTopicScoreRow[])
+    .filter(
+      (row) =>
+        typeof row.topic_id === "string" &&
+        typeof row.correct_count === "number" &&
+        typeof row.total_count === "number",
+    )
+    .map((row) => ({
+      topicId: row.topic_id,
+      topicName: extractTopicName(row.topics, row.topic_id),
+      correctCount: row.correct_count,
+      totalCount: row.total_count,
+    }));
+
+  return {
+    attempt: {
+      ...attempt,
+      topicScores,
+    },
   };
 }
 

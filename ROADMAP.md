@@ -57,7 +57,7 @@ Goal: Rendir simulador de punta a punta con temporizador y resultados.
 - [x] V1-F3-006: UI de examen con navegacion solo adelante
 - [x] V1-F3-007: Finalizacion manual y calculo de resultados
 - [x] V1-F3-008: Expiracion automatica por tiempo
-- [ ] V1-F3-009: Historial y detalle de resultados del estudiante
+- [x] V1-F3-009: Historial y detalle de resultados del estudiante
 - [ ] V1-F3-010: Bloqueo estricto de mutaciones post cierre
 
 ## Epic 5 - Fase 4: Reportes admin
