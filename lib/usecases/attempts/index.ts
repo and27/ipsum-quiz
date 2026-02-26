@@ -1,4 +1,5 @@
 export {
+  expireDueAttempts,
   finishAttemptForStudent,
   getAttemptExamStateForStudent,
   getActiveAttemptForStudent,

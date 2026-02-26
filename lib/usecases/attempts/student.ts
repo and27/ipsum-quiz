@@ -9,6 +9,7 @@ import type {
   StudentActiveAttemptResponse,
 } from "@/lib/domain/contracts";
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   StudentAccessError,
   verifySimulatorAccessCodeForStudent,
@@ -72,6 +73,15 @@ interface RawScoreRow {
   topic_name: string | null;
   correct_option_id: string | null;
 }
+
+interface TopicScoreAggregate {
+  topicId: string;
+  topicName: string;
+  totalCount: number;
+  correctCount: number;
+}
+
+type DbClient = SupabaseClient;
 
 interface RawExamQuestionOptionRow {
   id?: unknown;
@@ -236,6 +246,160 @@ function mapStartRpcError(errorMessage: string): StudentAttemptError {
   );
 }
 
+async function calculateAndPersistAttemptScores(
+  supabase: DbClient,
+  attemptId: string,
+): Promise<{ scoreTotal: number; topicScores: TopicScoreAggregate[] }> {
+  const { data: scoreRows, error: scoreError } = await supabase.rpc(
+    "get_attempt_score_rows",
+    {
+      p_attempt_id: attemptId,
+    },
+  );
+
+  if (scoreError) {
+    throw new Error(scoreError.message);
+  }
+
+  const rows = (scoreRows ?? []) as RawScoreRow[];
+  const topicMap = new Map<string, TopicScoreAggregate>();
+  let scoreTotal = 0;
+
+  for (const row of rows) {
+    if (
+      typeof row.simulator_version_question_id !== "string" ||
+      typeof row.question_topic_id !== "string"
+    ) {
+      continue;
+    }
+    const selectedOptionId =
+      row.selected_option_id && typeof row.selected_option_id === "string"
+        ? row.selected_option_id
+        : null;
+    const correctOptionId =
+      row.correct_option_id && typeof row.correct_option_id === "string"
+        ? row.correct_option_id
+        : null;
+    const isCorrect =
+      !!selectedOptionId &&
+      !!correctOptionId &&
+      selectedOptionId === correctOptionId;
+
+    const key = row.question_topic_id;
+    const current = topicMap.get(key) ?? {
+      topicId: key,
+      topicName:
+        row.topic_name && typeof row.topic_name === "string" ? row.topic_name : key,
+      totalCount: 0,
+      correctCount: 0,
+    };
+    current.totalCount += 1;
+    if (isCorrect) {
+      current.correctCount += 1;
+      scoreTotal += 1;
+    }
+    topicMap.set(key, current);
+  }
+
+  const topicScores = Array.from(topicMap.values());
+
+  const { error: deleteTopicScoresError } = await supabase
+    .from("attempt_topic_scores")
+    .delete()
+    .eq("attempt_id", attemptId);
+  if (deleteTopicScoresError) {
+    throw new Error(deleteTopicScoresError.message);
+  }
+
+  if (topicScores.length > 0) {
+    const { error: insertTopicScoresError } = await supabase
+      .from("attempt_topic_scores")
+      .insert(
+        topicScores.map((topic) => ({
+          attempt_id: attemptId,
+          topic_id: topic.topicId,
+          correct_count: topic.correctCount,
+          total_count: topic.totalCount,
+        })),
+      );
+    if (insertTopicScoresError) {
+      throw new Error(insertTopicScoresError.message);
+    }
+  }
+
+  const { error: updateAnswersError } = await supabase.rpc(
+    "set_attempt_answers_correctness",
+    {
+      p_attempt_id: attemptId,
+    },
+  );
+  if (updateAnswersError) {
+    throw new Error(updateAnswersError.message);
+  }
+
+  return {
+    scoreTotal,
+    topicScores,
+  };
+}
+
+async function closeAttemptWithScores(
+  supabase: DbClient,
+  input: { attemptId: string; status: "finished" | "expired" },
+): Promise<{
+  attemptId: string;
+  status: "finished" | "expired";
+  scoreTotal: number;
+  questionsTotal: number;
+  topicScores: TopicScoreAggregate[];
+} | null> {
+  const { scoreTotal, topicScores } = await calculateAndPersistAttemptScores(
+    supabase,
+    input.attemptId,
+  );
+
+  const nowIso = new Date().toISOString();
+  const { data: closedAttempt, error: closeError } = await supabase
+    .from("attempts")
+    .update({
+      status: input.status,
+      finished_at: nowIso,
+      score_total: scoreTotal,
+    })
+    .eq("id", input.attemptId)
+    .eq("status", "active")
+    .select("id, status, score_total, questions_total")
+    .maybeSingle();
+
+  if (closeError) {
+    throw new Error(closeError.message);
+  }
+  if (!closedAttempt) {
+    return null;
+  }
+
+  return {
+    attemptId: closedAttempt.id,
+    status: input.status,
+    scoreTotal:
+      typeof closedAttempt.score_total === "number"
+        ? closedAttempt.score_total
+        : scoreTotal,
+    questionsTotal: closedAttempt.questions_total,
+    topicScores,
+  };
+}
+
+async function expireAttemptIfActive(
+  supabase: DbClient,
+  attemptId: string,
+): Promise<void> {
+  await closeAttemptWithScores(supabase, {
+    attemptId,
+    status: "expired",
+  });
+}
+
 export async function startOrResumeAttemptForStudent(input: {
   simulatorId: string;
   studentId: string;
@@ -301,18 +465,7 @@ export async function getActiveAttemptForStudent(input: {
 
   const now = Date.now();
   if (Date.parse(activeAttempt.expires_at) <= now) {
-    const { error: expireError } = await supabase
-      .from("attempts")
-      .update({
-        status: "expired",
-        finished_at: new Date(now).toISOString(),
-      })
-      .eq("id", activeAttempt.id)
-      .eq("status", "active");
-
-    if (expireError) {
-      throw new Error(expireError.message);
-    }
+    await expireAttemptIfActive(supabase, activeAttempt.id);
 
     throw new StudentAttemptError(
       "active_attempt_not_found",
@@ -371,18 +524,7 @@ export async function saveAttemptAnswerForStudent(input: {
   }
 
   if (Date.parse(attemptRow.expires_at) <= Date.now()) {
-    const { error: expireError } = await supabase
-      .from("attempts")
-      .update({
-        status: "expired",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", input.attemptId)
-      .eq("status", "active");
-
-    if (expireError) {
-      throw new Error(expireError.message);
-    }
+    await expireAttemptIfActive(supabase, input.attemptId);
 
     throw new StudentAttemptError(
       "attempt_not_active",
@@ -487,17 +629,7 @@ export async function getAttemptExamStateForStudent(input: {
   }
 
   if (Date.parse(attemptRow.expires_at) <= Date.now()) {
-    const { error: expireError } = await supabase
-      .from("attempts")
-      .update({
-        status: "expired",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", attemptRow.id)
-      .eq("status", "active");
-    if (expireError) {
-      throw new Error(expireError.message);
-    }
+    await expireAttemptIfActive(supabase, attemptRow.id);
     throw new StudentAttemptError("attempt_expired", "Attempt has expired.");
   }
 
@@ -587,107 +719,11 @@ export async function finishAttemptForStudent(input: {
     throw new StudentAttemptError("attempt_not_active", "Attempt is no longer active.");
   }
 
-  const { data: scoreRows, error: scoreError } = await supabase.rpc(
-    "get_attempt_score_rows",
-    {
-      p_attempt_id: input.attemptId,
-    },
-  );
-
-  if (scoreError) {
-    throw new Error(scoreError.message);
-  }
-
-  const rows = (scoreRows ?? []) as RawScoreRow[];
-  const topicMap = new Map<
-    string,
-    { topicId: string; topicName: string; totalCount: number; correctCount: number }
-  >();
-  let scoreTotal = 0;
-
-  for (const row of rows) {
-    if (
-      typeof row.simulator_version_question_id !== "string" ||
-      typeof row.question_topic_id !== "string"
-    ) {
-      continue;
-    }
-    const selectedOptionId =
-      row.selected_option_id && typeof row.selected_option_id === "string"
-        ? row.selected_option_id
-        : null;
-    const correctOptionId =
-      row.correct_option_id && typeof row.correct_option_id === "string"
-        ? row.correct_option_id
-        : null;
-    const isCorrect = !!selectedOptionId && !!correctOptionId && selectedOptionId === correctOptionId;
-
-    const key = row.question_topic_id;
-    const current = topicMap.get(key) ?? {
-      topicId: key,
-      topicName:
-        row.topic_name && typeof row.topic_name === "string" ? row.topic_name : key,
-      totalCount: 0,
-      correctCount: 0,
-    };
-    current.totalCount += 1;
-    if (isCorrect) {
-      current.correctCount += 1;
-      scoreTotal += 1;
-    }
-    topicMap.set(key, current);
-  }
-
-  const topicScores = Array.from(topicMap.values());
-
-  const { error: deleteTopicScoresError } = await supabase
-    .from("attempt_topic_scores")
-    .delete()
-    .eq("attempt_id", input.attemptId);
-  if (deleteTopicScoresError) {
-    throw new Error(deleteTopicScoresError.message);
-  }
-
-  if (topicScores.length > 0) {
-    const { error: insertTopicScoresError } = await supabase
-      .from("attempt_topic_scores")
-      .insert(
-        topicScores.map((topic) => ({
-          attempt_id: input.attemptId,
-          topic_id: topic.topicId,
-          correct_count: topic.correctCount,
-          total_count: topic.totalCount,
-        })),
-      );
-    if (insertTopicScoresError) {
-      throw new Error(insertTopicScoresError.message);
-    }
-  }
-
-  const { error: updateAnswersError } = await supabase.rpc("set_attempt_answers_correctness", {
-    p_attempt_id: input.attemptId,
+  const finishedAttempt = await closeAttemptWithScores(supabase, {
+    attemptId: input.attemptId,
+    status: "finished",
   });
-  if (updateAnswersError) {
-    throw new Error(updateAnswersError.message);
-  }
-
-  const nowIso = new Date().toISOString();
-  const { data: finishedAttempt, error: finishError } = await supabase
-    .from("attempts")
-    .update({
-      status: "finished",
-      finished_at: nowIso,
-      score_total: scoreTotal,
-    })
-    .eq("id", input.attemptId)
-    .eq("status", "active")
-    .select("id, status, score_total, questions_total")
-    .maybeSingle();
-
-  if (finishError) {
-    throw new Error(finishError.message);
-  }
-  if (!finishedAttempt || finishedAttempt.status !== "finished") {
+  if (!finishedAttempt) {
     throw new StudentAttemptError(
       "attempt_not_active",
       "Attempt is no longer active.",
@@ -695,14 +731,54 @@ export async function finishAttemptForStudent(input: {
   }
 
   return {
-    attemptId: finishedAttempt.id,
+    attemptId: finishedAttempt.attemptId,
     status: "finished",
-    scoreTotal: typeof finishedAttempt.score_total === "number" ? finishedAttempt.score_total : scoreTotal,
-    questionsTotal:
-      typeof finishedAttempt.questions_total === "number"
-        ? finishedAttempt.questions_total
-        : attemptRow.questions_total,
-    topicScores,
+    scoreTotal: finishedAttempt.scoreTotal,
+    questionsTotal: finishedAttempt.questionsTotal ?? attemptRow.questions_total,
+    topicScores: finishedAttempt.topicScores,
+  };
+}
+
+export async function expireDueAttempts(input?: {
+  supabase?: DbClient;
+  nowIso?: string;
+  limit?: number;
+}): Promise<{ scannedCount: number; expiredCount: number; attemptIds: string[] }> {
+  const supabase = input?.supabase ?? (await createClient());
+  const nowIso = input?.nowIso ?? new Date().toISOString();
+  const limit = input?.limit ?? 200;
+
+  const { data: rows, error } = await supabase
+    .from("attempts")
+    .select("id")
+    .eq("status", "active")
+    .lte("expires_at", nowIso)
+    .order("expires_at", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const attemptIds = (rows ?? [])
+    .map((row) => row.id)
+    .filter((id): id is string => typeof id === "string");
+
+  let expiredCount = 0;
+  for (const attemptId of attemptIds) {
+    const result = await closeAttemptWithScores(supabase, {
+      attemptId,
+      status: "expired",
+    });
+    if (result) {
+      expiredCount += 1;
+    }
+  }
+
+  return {
+    scannedCount: attemptIds.length,
+    expiredCount,
+    attemptIds,
   };
 }
 
