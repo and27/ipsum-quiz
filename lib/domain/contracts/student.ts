@@ -62,3 +62,11 @@ export interface StudentVisibleSimulatorsQuery {
 }
 
 export type StudentVisibleSimulatorsResponse = PaginatedResult<StudentVisibleSimulator>;
+
+export interface StudentVerifyAccessCodeRequest {
+  accessCode?: string;
+}
+
+export interface StudentVerifyAccessCodeResponse {
+  ok: true;
+}

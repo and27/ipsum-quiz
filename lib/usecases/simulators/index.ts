@@ -18,4 +18,12 @@ export {
   type SimulatorBuilderErrorCode,
   validateDraftVersionBeforePublish,
 } from "./builder";
-export { listVisibleSimulatorsForStudent } from "./student";
+export {
+  listVisibleSimulatorsForStudent,
+} from "./student";
+export {
+  extractClientIpAddress,
+  StudentAccessError,
+  type StudentAccessErrorCode,
+  verifySimulatorAccessCodeForStudent,
+} from "./student-access";
