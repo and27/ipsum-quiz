@@ -4,6 +4,7 @@ import type {
   PaginatedResult,
   UUID,
 } from "@/lib/domain/common";
+import type { Simulator } from "@/lib/domain/simulator";
 
 export interface StartAttemptRequest {
   simulatorId: UUID;
@@ -47,3 +48,9 @@ export interface StudentAttemptResultResponse {
   attempt: AttemptResult;
 }
 
+export interface StudentVisibleSimulatorsQuery {
+  page?: number;
+  pageSize?: number;
+}
+
+export type StudentVisibleSimulatorsResponse = PaginatedResult<Simulator>;

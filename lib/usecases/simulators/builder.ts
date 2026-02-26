@@ -10,11 +10,13 @@ import { createClient } from "@/lib/supabase/server";
 export type SimulatorBuilderErrorCode =
   | "simulator_not_found"
   | "version_not_found"
+  | "draft_not_found"
   | "question_not_found"
   | "question_not_eligible"
   | "invalid_position"
   | "not_found"
-  | "duplicate_question";
+  | "duplicate_question"
+  | "publish_validation_failed";
 
 export class SimulatorBuilderError extends Error {
   readonly code: SimulatorBuilderErrorCode;
@@ -273,6 +275,26 @@ async function getOrCreateDraftVersion(simulatorId: string): Promise<SimulatorVe
   }
 
   return parsedCreated;
+}
+
+async function getLatestDraftVersion(simulatorId: string): Promise<SimulatorVersion | null> {
+  const supabase = await createClient();
+  const { data: existingDraft, error: draftError } = await supabase
+    .from("simulator_versions")
+    .select(
+      "id, simulator_id, version_number, status, created_from_version_id, published_at, has_attempts, created_at, updated_at",
+    )
+    .eq("simulator_id", simulatorId)
+    .eq("status", "draft")
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (draftError) {
+    throw new Error(draftError.message);
+  }
+
+  return parseVersionRow(existingDraft as RawVersionRow);
 }
 
 async function listVersionQuestions(
@@ -681,5 +703,88 @@ export async function validateDraftVersionBeforePublish(
     versionId: draftVersion.id,
     isValid: issues.length === 0,
     issues,
+  };
+}
+
+export async function publishDraftVersion(simulatorId: string): Promise<{
+  simulator: Simulator;
+  publishedVersion: SimulatorVersion;
+  validation: SimulatorPublishValidation;
+}> {
+  const simulator = await getSimulatorById(simulatorId);
+  const draftVersion = await getLatestDraftVersion(simulator.id);
+  if (!draftVersion) {
+    throw new SimulatorBuilderError(
+      "draft_not_found",
+      "No draft version found to publish.",
+    );
+  }
+
+  const validation = await validateDraftVersionBeforePublish(simulator.id);
+  if (!validation.isValid) {
+    throw new SimulatorBuilderError(
+      "publish_validation_failed",
+      "Draft version is not valid for publish.",
+    );
+  }
+
+  const supabase = await createClient();
+
+  const { error: archiveError } = await supabase
+    .from("simulator_versions")
+    .update({ status: "archived" })
+    .eq("simulator_id", simulator.id)
+    .eq("status", "published");
+  if (archiveError) {
+    throw new Error(archiveError.message);
+  }
+
+  const { data: publishedVersionRow, error: publishVersionError } = await supabase
+    .from("simulator_versions")
+    .update({
+      status: "published",
+      published_at: new Date().toISOString(),
+    })
+    .eq("id", draftVersion.id)
+    .eq("simulator_id", simulator.id)
+    .select(
+      "id, simulator_id, version_number, status, created_from_version_id, published_at, has_attempts, created_at, updated_at",
+    )
+    .maybeSingle();
+  if (publishVersionError) {
+    throw new Error(publishVersionError.message);
+  }
+  const publishedVersion = parseVersionRow(publishedVersionRow as RawVersionRow);
+  if (!publishedVersion) {
+    throw new SimulatorBuilderError(
+      "version_not_found",
+      "Draft version was not found.",
+    );
+  }
+
+  const { data: updatedSimulatorRow, error: updateSimulatorError } = await supabase
+    .from("simulators")
+    .update({
+      status: "published",
+      published_version_id: publishedVersion.id,
+    })
+    .eq("id", simulator.id)
+    .select(
+      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+    )
+    .single();
+  if (updateSimulatorError) {
+    throw new Error(updateSimulatorError.message);
+  }
+
+  const updatedSimulator = parseSimulatorRow(updatedSimulatorRow as RawSimulatorRow);
+  if (!updatedSimulator) {
+    throw new Error("Invalid simulator payload returned from database.");
+  }
+
+  return {
+    simulator: updatedSimulator,
+    publishedVersion,
+    validation,
   };
 }

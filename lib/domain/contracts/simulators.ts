@@ -60,3 +60,9 @@ export interface AdminSimulatorBuilderQuestionResponse {
 export interface AdminSimulatorPublishValidationResponse {
   validation: SimulatorPublishValidation;
 }
+
+export interface AdminSimulatorPublishResponse {
+  simulator: Simulator;
+  publishedVersion: SimulatorVersion;
+  validation: SimulatorPublishValidation;
+}

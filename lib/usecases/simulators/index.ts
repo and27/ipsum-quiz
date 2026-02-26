@@ -10,9 +10,11 @@ export {
 export {
   addQuestionToDraftVersion,
   getSimulatorBuilderState,
+  publishDraftVersion,
   removeQuestionFromDraftVersion,
   reorderDraftVersionQuestion,
   SimulatorBuilderError,
   type SimulatorBuilderErrorCode,
   validateDraftVersionBeforePublish,
 } from "./builder";
+export { listVisibleSimulatorsForStudent } from "./student";

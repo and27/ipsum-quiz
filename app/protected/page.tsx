@@ -25,32 +25,45 @@ async function UserDetails() {
 
 async function AdminQuickLinks() {
   const session = await getCurrentSessionContext();
-  if (session.role !== "admin") {
-    return null;
+  if (session.role === "admin") {
+    return (
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/protected/admin/topics"
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        >
+          Manage topics
+        </Link>
+        <Link
+          href="/protected/admin/questions"
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        >
+          Manage questions
+        </Link>
+        <Link
+          href="/protected/admin/simulators"
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        >
+          Manage simulators
+        </Link>
+      </div>
+    );
   }
 
-  return (
-    <div className="flex flex-wrap gap-3">
-      <Link
-        href="/protected/admin/topics"
-        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
-      >
-        Manage topics
-      </Link>
-      <Link
-        href="/protected/admin/questions"
-        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
-      >
-        Manage questions
-      </Link>
-      <Link
-        href="/protected/admin/simulators"
-        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
-      >
-        Manage simulators
-      </Link>
-    </div>
-  );
+  if (session.role === "student") {
+    return (
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/protected/student/simulators"
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        >
+          View simulators
+        </Link>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function ProtectedPage() {

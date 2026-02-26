@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AdminSimulatorPublishResponse,
   AdminSimulatorBuilderStateResponse,
   AdminSimulatorPublishValidationResponse,
   Question,
@@ -55,6 +56,7 @@ export function SimulatorVersionBuilderManager({
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [isValidating, setIsValidating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [validationResult, setValidationResult] = useState<
     AdminSimulatorPublishValidationResponse["validation"] | null
   >(null);
@@ -195,6 +197,29 @@ export function SimulatorVersionBuilderManager({
     }
   }
 
+  async function handlePublishDraftVersion() {
+    setIsPublishing(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const response = await fetch(`/api/admin/simulators/${simulatorId}/publish`, {
+        method: "POST",
+      });
+      const payload = await parseApiResponse<AdminSimulatorPublishResponse>(response);
+      setValidationResult(payload.validation);
+      setSuccessMessage(
+        `Draft version v${payload.publishedVersion.versionNumber} published successfully.`,
+      );
+      await loadState();
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to publish draft version.",
+      );
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-6">
       <Card>
@@ -331,13 +356,22 @@ export function SimulatorVersionBuilderManager({
           <CardTitle>Publish Validation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button
-            type="button"
-            onClick={handleValidateBeforePublish}
-            disabled={isValidating}
-          >
-            {isValidating ? "Validating..." : "Run validation"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={handleValidateBeforePublish}
+              disabled={isValidating || isPublishing}
+            >
+              {isValidating ? "Validating..." : "Run validation"}
+            </Button>
+            <Button
+              type="button"
+              onClick={handlePublishDraftVersion}
+              disabled={isPublishing || isValidating}
+            >
+              {isPublishing ? "Publishing..." : "Publish draft version"}
+            </Button>
+          </div>
 
           {validationResult ? (
             <div className="space-y-2">
@@ -366,4 +400,3 @@ export function SimulatorVersionBuilderManager({
     </div>
   );
 }
-
