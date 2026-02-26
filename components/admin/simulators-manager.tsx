@@ -66,6 +66,110 @@ function buildEditAccessCode(simulators: Simulator[]): Record<string, string> {
   );
 }
 
+interface SimulatorFormFieldsProps {
+  prefix: string;
+  title: string;
+  description: string;
+  durationMinutes: string;
+  maxAttempts: string;
+  accessCode: string;
+  disabled: boolean;
+  onTitleChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onDurationChange: (value: string) => void;
+  onMaxAttemptsChange: (value: string) => void;
+  onAccessCodeChange: (value: string) => void;
+}
+
+function SimulatorFormFields({
+  prefix,
+  title,
+  description,
+  durationMinutes,
+  maxAttempts,
+  accessCode,
+  disabled,
+  onTitleChange,
+  onDescriptionChange,
+  onDurationChange,
+  onMaxAttemptsChange,
+  onAccessCodeChange,
+}: SimulatorFormFieldsProps) {
+  return (
+    <>
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-title`} className="text-sm font-medium">
+          Titulo
+        </label>
+        <Input
+          id={`${prefix}-title`}
+          placeholder="Titulo del simulador"
+          value={title}
+          onChange={(event) => onTitleChange(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-description`} className="text-sm font-medium">
+          Descripcion
+        </label>
+        <textarea
+          id={`${prefix}-description`}
+          className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
+          placeholder="Descripcion (opcional)"
+          value={description}
+          onChange={(event) => onDescriptionChange(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor={`${prefix}-duration`} className="text-sm font-medium">
+            Duracion (minutos)
+          </label>
+          <Input
+            id={`${prefix}-duration`}
+            type="number"
+            min={1}
+            max={600}
+            placeholder="Duracion en minutos"
+            value={durationMinutes}
+            onChange={(event) => onDurationChange(event.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor={`${prefix}-max-attempts`} className="text-sm font-medium">
+            Intentos maximos
+          </label>
+          <Input
+            id={`${prefix}-max-attempts`}
+            type="number"
+            min={1}
+            max={20}
+            placeholder="Intentos maximos"
+            value={maxAttempts}
+            onChange={(event) => onMaxAttemptsChange(event.target.value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-access-code`} className="text-sm font-medium">
+          Codigo de acceso
+        </label>
+        <Input
+          id={`${prefix}-access-code`}
+          placeholder="Codigo de acceso (opcional)"
+          value={accessCode}
+          onChange={(event) => onAccessCodeChange(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+    </>
+  );
+}
+
 export function SimulatorsManager({
   initialSimulators,
 }: SimulatorsManagerProps) {
@@ -73,6 +177,7 @@ export function SimulatorsManager({
   const [meta, setMeta] = useState<PaginationMeta>(initialSimulators.meta);
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingSimulatorId, setEditingSimulatorId] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -173,7 +278,7 @@ export function SimulatorsManager({
   async function handleUpdateSimulator(
     simulator: Simulator,
     payload: AdminSimulatorUpdateRequest,
-  ) {
+  ): Promise<boolean> {
     setRowBusy((prev) => ({ ...prev, [simulator.id]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -207,10 +312,12 @@ export function SimulatorsManager({
         [updatedSimulator.id]: updatedSimulator.accessCode ?? "",
       }));
       setSuccessMessage("Simulador actualizado.");
+      return true;
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudo actualizar el simulador.",
       );
+      return false;
     } finally {
       setRowBusy((prev) => ({ ...prev, [simulator.id]: false }));
     }
@@ -226,75 +333,20 @@ export function SimulatorsManager({
           trigger={<Button type="button">Crear simulador</Button>}
         >
           <form onSubmit={handleCreateSimulator} className="space-y-3">
-            <div className="space-y-1">
-              <label htmlFor="new-simulator-title" className="text-sm font-medium">
-                Titulo
-              </label>
-              <Input
-                id="new-simulator-title"
-                placeholder="Titulo del simulador"
-                value={newTitle}
-                onChange={(event) => setNewTitle(event.target.value)}
-                disabled={isCreating}
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="new-simulator-description" className="text-sm font-medium">
-                Descripcion
-              </label>
-              <textarea
-                id="new-simulator-description"
-                className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-                placeholder="Descripcion (opcional)"
-                value={newDescription}
-                onChange={(event) => setNewDescription(event.target.value)}
-                disabled={isCreating}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label htmlFor="new-simulator-duration" className="text-sm font-medium">
-                  Duracion (minutos)
-                </label>
-                <Input
-                  id="new-simulator-duration"
-                  type="number"
-                  min={1}
-                  max={600}
-                  placeholder="Duracion en minutos"
-                  value={newDurationMinutes}
-                  onChange={(event) => setNewDurationMinutes(event.target.value)}
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="new-simulator-max-attempts" className="text-sm font-medium">
-                  Intentos maximos
-                </label>
-                <Input
-                  id="new-simulator-max-attempts"
-                  type="number"
-                  min={1}
-                  max={20}
-                  placeholder="Intentos maximos"
-                  value={newMaxAttempts}
-                  onChange={(event) => setNewMaxAttempts(event.target.value)}
-                  disabled={isCreating}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="new-simulator-access-code" className="text-sm font-medium">
-                Codigo de acceso
-              </label>
-              <Input
-                id="new-simulator-access-code"
-                placeholder="Codigo de acceso (opcional)"
-                value={newAccessCode}
-                onChange={(event) => setNewAccessCode(event.target.value)}
-                disabled={isCreating}
-              />
-            </div>
+            <SimulatorFormFields
+              prefix="new-simulator"
+              title={newTitle}
+              description={newDescription}
+              durationMinutes={newDurationMinutes}
+              maxAttempts={newMaxAttempts}
+              accessCode={newAccessCode}
+              disabled={isCreating}
+              onTitleChange={setNewTitle}
+              onDescriptionChange={setNewDescription}
+              onDurationChange={setNewDurationMinutes}
+              onMaxAttemptsChange={setNewMaxAttempts}
+              onAccessCodeChange={setNewAccessCode}
+            />
             <Button type="submit" disabled={isCreating}>
               {isCreating ? "Creando..." : "Crear simulador"}
             </Button>
@@ -366,129 +418,146 @@ export function SimulatorsManager({
                     </Badge>
                   </div>
 
-                  <Input
-                    id={`simulator-title-${simulator.id}`}
-                    value={title}
-                    onChange={(event) =>
-                      setEditTitle((prev) => ({ ...prev, [simulator.id]: event.target.value }))
-                    }
-                    disabled={busy}
-                  />
-                  <label
-                    htmlFor={`simulator-title-${simulator.id}`}
-                    className="sr-only"
-                  >
-                    Titulo del simulador
-                  </label>
-
-                  <textarea
-                    id={`simulator-description-${simulator.id}`}
-                    className="min-h-20 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-                    value={description}
-                    onChange={(event) =>
-                      setEditDescription((prev) => ({
-                        ...prev,
-                        [simulator.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy}
-                  />
-                  <label
-                    htmlFor={`simulator-description-${simulator.id}`}
-                    className="sr-only"
-                  >
-                    Descripcion del simulador
-                  </label>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input
-                      id={`simulator-duration-${simulator.id}`}
-                      type="number"
-                      min={1}
-                      max={600}
-                      value={durationMinutes}
-                      onChange={(event) =>
-                        setEditDuration((prev) => ({
-                          ...prev,
-                          [simulator.id]: event.target.value,
-                        }))
-                      }
-                      disabled={busy}
-                    />
-                    <label
-                      htmlFor={`simulator-duration-${simulator.id}`}
-                      className="sr-only"
-                    >
-                      Duracion en minutos
-                    </label>
-
-                    <Input
-                      id={`simulator-max-attempts-${simulator.id}`}
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={maxAttempts}
-                      onChange={(event) =>
-                        setEditMaxAttempts((prev) => ({
-                          ...prev,
-                          [simulator.id]: event.target.value,
-                        }))
-                      }
-                      disabled={busy}
-                    />
-                    <label
-                      htmlFor={`simulator-max-attempts-${simulator.id}`}
-                      className="sr-only"
-                    >
-                      Intentos maximos
-                    </label>
+                  <div className="grid gap-3 rounded-md bg-muted/50 p-3 text-sm sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Titulo
+                      </p>
+                      <p className="font-medium">{simulator.title}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Codigo de acceso
+                      </p>
+                      <p className="font-medium">
+                        {simulator.accessCode && simulator.accessCode.length > 0
+                          ? simulator.accessCode
+                          : "No configurado"}
+                      </p>
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Descripcion
+                      </p>
+                      <p className="font-medium">
+                        {simulator.description && simulator.description.length > 0
+                          ? simulator.description
+                          : "Sin descripcion"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Duracion
+                      </p>
+                      <p className="font-medium">{simulator.durationMinutes} minutos</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Intentos maximos
+                      </p>
+                      <p className="font-medium">{simulator.maxAttempts}</p>
+                    </div>
                   </div>
 
-                  <Input
-                    id={`simulator-access-code-${simulator.id}`}
-                    placeholder="Codigo de acceso (opcional)"
-                    value={accessCode}
-                    onChange={(event) =>
-                      setEditAccessCode((prev) => ({
-                        ...prev,
-                        [simulator.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy}
-                  />
-                  <label
-                    htmlFor={`simulator-access-code-${simulator.id}`}
-                    className="sr-only"
-                  >
-                    Nuevo codigo de acceso
-                  </label>
-
                   <div className="flex flex-wrap gap-2">
+                    <BaseModal
+                      open={editingSimulatorId === simulator.id}
+                      onOpenChange={(open) =>
+                        setEditingSimulatorId(open ? simulator.id : null)
+                      }
+                      title="Editar simulador"
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => {
+                            setEditTitle((prev) => ({ ...prev, [simulator.id]: simulator.title }));
+                            setEditDescription((prev) => ({
+                              ...prev,
+                              [simulator.id]: simulator.description ?? "",
+                            }));
+                            setEditDuration((prev) => ({
+                              ...prev,
+                              [simulator.id]: String(simulator.durationMinutes),
+                            }));
+                            setEditMaxAttempts((prev) => ({
+                              ...prev,
+                              [simulator.id]: String(simulator.maxAttempts),
+                            }));
+                            setEditAccessCode((prev) => ({
+                              ...prev,
+                              [simulator.id]: simulator.accessCode ?? "",
+                            }));
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      }
+                    >
+                      <form
+                        className="space-y-3"
+                        onSubmit={async (event) => {
+                          event.preventDefault();
+                          const didUpdate = await handleUpdateSimulator(simulator, {
+                            title,
+                            description: description || null,
+                            durationMinutes: Number(durationMinutes),
+                            maxAttempts: Number(maxAttempts),
+                            accessCode:
+                              accessCodeChanged
+                                ? normalizedAccessCode.length > 0
+                                  ? normalizedAccessCode
+                                  : null
+                                : undefined,
+                          });
+                          if (didUpdate) {
+                            setEditingSimulatorId(null);
+                          }
+                        }}
+                      >
+                        <SimulatorFormFields
+                          prefix={`edit-simulator-${simulator.id}`}
+                          title={title}
+                          description={description}
+                          durationMinutes={durationMinutes}
+                          maxAttempts={maxAttempts}
+                          accessCode={accessCode}
+                          disabled={busy}
+                          onTitleChange={(value) =>
+                            setEditTitle((prev) => ({ ...prev, [simulator.id]: value }))
+                          }
+                          onDescriptionChange={(value) =>
+                            setEditDescription((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
+                          }
+                          onDurationChange={(value) =>
+                            setEditDuration((prev) => ({ ...prev, [simulator.id]: value }))
+                          }
+                          onMaxAttemptsChange={(value) =>
+                            setEditMaxAttempts((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
+                          }
+                          onAccessCodeChange={(value) =>
+                            setEditAccessCode((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
+                          }
+                        />
+                        <Button type="submit" disabled={busy || !hasChanges}>
+                          {busy ? "Guardando..." : "Guardar cambios"}
+                        </Button>
+                      </form>
+                    </BaseModal>
                     <Button asChild type="button" variant="outline" disabled={busy}>
                       <Link href={`/protected/admin/simulators/${simulator.id}/builder`}>
                         Abrir constructor
                       </Link>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy || !hasChanges}
-                      onClick={() =>
-                        handleUpdateSimulator(simulator, {
-                          title,
-                          description: description || null,
-                          durationMinutes: Number(durationMinutes),
-                          maxAttempts: Number(maxAttempts),
-                          accessCode:
-                            accessCodeChanged
-                              ? normalizedAccessCode.length > 0
-                                ? normalizedAccessCode
-                                : null
-                              : undefined,
-                        })
-                      }
-                    >
-                      Guardar
                     </Button>
 
                     <Button

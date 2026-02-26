@@ -31,6 +31,20 @@ interface DraftOption {
   isCorrect: boolean;
 }
 
+interface QuestionDetailsFormFieldsProps {
+  prefix: string;
+  topicId: string;
+  statement: string;
+  imageUrl: string;
+  availableTopics: Topic[];
+  disabled: boolean;
+  uploadingImage: boolean;
+  onTopicChange: (value: string) => void;
+  onStatementChange: (value: string) => void;
+  onImageUrlChange: (value: string) => void;
+  onUploadImage: (file: File) => Promise<void>;
+}
+
 interface ApiErrorResponse {
   error?: string;
 }
@@ -82,6 +96,103 @@ async function uploadAdminImage(
   return payload.asset.finalUrl;
 }
 
+function QuestionDetailsFormFields({
+  prefix,
+  topicId,
+  statement,
+  imageUrl,
+  availableTopics,
+  disabled,
+  uploadingImage,
+  onTopicChange,
+  onStatementChange,
+  onImageUrlChange,
+  onUploadImage,
+}: QuestionDetailsFormFieldsProps) {
+  return (
+    <>
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-topic`} className="text-sm font-medium">
+          Tema
+        </label>
+        <select
+          id={`${prefix}-topic`}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
+          value={topicId}
+          onChange={(event) => onTopicChange(event.target.value)}
+          disabled={disabled}
+        >
+          {availableTopics.map((topic) => (
+            <option
+              key={topic.id}
+              value={topic.id}
+              style={{ backgroundColor: "#ffffff", color: "#111111" }}
+            >
+              {topic.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-statement`} className="text-sm font-medium">
+          Enunciado
+        </label>
+        <textarea
+          id={`${prefix}-statement`}
+          className="min-h-24 w-full rounded-md border border-input bg-transparent p-3 text-sm"
+          placeholder="Enunciado de la pregunta"
+          value={statement}
+          onChange={(event) => onStatementChange(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-image-url`} className="text-sm font-medium">
+          URL de imagen
+        </label>
+        <Input
+          id={`${prefix}-image-url`}
+          placeholder="URL de imagen (opcional)"
+          value={imageUrl}
+          onChange={(event) => onImageUrlChange(event.target.value)}
+          disabled={disabled || uploadingImage}
+        />
+      </div>
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt="Vista previa de la pregunta"
+          className="max-h-48 rounded border object-contain"
+        />
+      ) : null}
+      <div className="space-y-1">
+        <label htmlFor={`${prefix}-image-file`} className="text-sm font-medium">
+          Subir imagen
+        </label>
+        <Input
+          id={`${prefix}-image-file`}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={disabled || uploadingImage}
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) {
+              return;
+            }
+            await onUploadImage(file);
+          }}
+        />
+      </div>
+      {uploadingImage ? (
+        <p className="text-xs text-muted-foreground">Procesando y subiendo imagen...</p>
+      ) : null}
+    </>
+  );
+}
+
 export function QuestionsManager({
   initialQuestions,
   availableTopics,
@@ -90,6 +201,7 @@ export function QuestionsManager({
   const [meta, setMeta] = useState<PaginationMeta>(initialQuestions.meta);
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isUploadingCreateImage, setIsUploadingCreateImage] = useState(false);
@@ -270,7 +382,7 @@ export function QuestionsManager({
   async function handleUpdateQuestion(
     question: Question,
     payload: AdminQuestionUpdateRequest,
-  ) {
+  ): Promise<boolean> {
     setRowBusy((prev) => ({ ...prev, [question.id]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -281,13 +393,30 @@ export function QuestionsManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      await parseApiResponse<AdminQuestionResponse>(response);
+      const parsed = await parseApiResponse<AdminQuestionResponse>(response);
+      const updatedQuestion = parsed.question;
+      setQuestions((prev) =>
+        prev.map((item) => (item.id === updatedQuestion.id ? updatedQuestion : item)),
+      );
+      setEditStatements((prev) => ({
+        ...prev,
+        [updatedQuestion.id]: updatedQuestion.statement,
+      }));
+      setEditTopicIds((prev) => ({
+        ...prev,
+        [updatedQuestion.id]: updatedQuestion.topicId,
+      }));
+      setEditImageUrls((prev) => ({
+        ...prev,
+        [updatedQuestion.id]: updatedQuestion.imageUrl ?? "",
+      }));
       setSuccessMessage("Pregunta actualizada.");
-      await loadQuestions(meta.page, includeInactive);
+      return true;
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudo actualizar la pregunta.",
       );
+      return false;
     } finally {
       setRowBusy((prev) => ({ ...prev, [question.id]: false }));
     }
@@ -303,62 +432,19 @@ export function QuestionsManager({
           trigger={<Button type="button">Crear pregunta</Button>}
         >
           <form onSubmit={handleCreateQuestion} className="space-y-3">
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
-              value={newTopicId}
-              onChange={(event) => setNewTopicId(event.target.value)}
+            <QuestionDetailsFormFields
+              prefix="new-question"
+              topicId={newTopicId}
+              statement={newStatement}
+              imageUrl={newImageUrl}
+              availableTopics={availableTopics}
               disabled={isCreating || !hasTopics}
-            >
-              {availableTopics.map((topic) => (
-                <option
-                  key={topic.id}
-                  value={topic.id}
-                  className="bg-background text-foreground"
-                >
-                  {topic.name}
-                </option>
-              ))}
-            </select>
-
-            <textarea
-              className="min-h-24 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              placeholder="Enunciado de la pregunta"
-              value={newStatement}
-              onChange={(event) => setNewStatement(event.target.value)}
-              disabled={isCreating}
+              uploadingImage={isUploadingCreateImage}
+              onTopicChange={setNewTopicId}
+              onStatementChange={setNewStatement}
+              onImageUrlChange={setNewImageUrl}
+              onUploadImage={handleCreateImageUpload}
             />
-
-            <Input
-              placeholder="URL de imagen (opcional)"
-              value={newImageUrl}
-              onChange={(event) => setNewImageUrl(event.target.value)}
-              disabled={isCreating || isUploadingCreateImage}
-            />
-            {newImageUrl ? (
-              <img
-                src={newImageUrl}
-                alt="Vista previa de la pregunta"
-                className="max-h-48 rounded border object-contain"
-              />
-            ) : null}
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={isCreating || isUploadingCreateImage}
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) {
-                  return;
-                }
-                await handleCreateImageUpload(file);
-              }}
-            />
-            {isUploadingCreateImage ? (
-              <p className="text-xs text-muted-foreground">
-                Procesando y subiendo imagen...
-              </p>
-            ) : null}
 
             <div className="space-y-2 rounded-md border p-3">
               <div className="flex items-center justify-between">
@@ -484,96 +570,121 @@ export function QuestionsManager({
                     {question.activeCorrectOptionsCount}
                   </p>
 
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
-                    value={editedTopicId}
-                    onChange={(event) =>
-                      setEditTopicIds((prev) => ({
-                        ...prev,
-                        [question.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy || uploadingImage}
-                  >
-                    {availableTopics.map((topic) => (
-                      <option
-                        key={topic.id}
-                        value={topic.id}
-                        className="bg-background text-foreground"
-                      >
-                        {topic.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-                    value={editedStatement}
-                    onChange={(event) =>
-                      setEditStatements((prev) => ({
-                        ...prev,
-                        [question.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy || uploadingImage}
-                  />
-
-                  <Input
-                    placeholder="URL de imagen (opcional)"
-                    value={editedImageUrl}
-                    onChange={(event) =>
-                      setEditImageUrls((prev) => ({
-                        ...prev,
-                        [question.id]: event.target.value,
-                      }))
-                    }
-                    disabled={busy || uploadingImage}
-                  />
-                  {editedImageUrl ? (
-                    <img
-                      src={editedImageUrl}
-                      alt="Vista previa de la pregunta"
-                      className="max-h-48 rounded border object-contain"
-                    />
-                  ) : null}
-                  <Input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={busy || uploadingImage}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (!file) {
-                        return;
-                      }
-                      await handleRowImageUpload(question.id, file);
-                    }}
-                  />
-                  {uploadingImage ? (
-                    <p className="text-xs text-muted-foreground">
-                      Procesando y subiendo imagen...
-                    </p>
-                  ) : null}
+                  <div className="grid gap-3 rounded-md bg-muted/50 p-3 text-sm">
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Tema
+                      </p>
+                      <p className="font-medium">{question.topicName}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Enunciado
+                      </p>
+                      <p className="font-medium">{question.statement}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Imagen
+                      </p>
+                      <p className="font-medium">
+                        {question.imageUrl ? "Configurada" : "Sin imagen"}
+                      </p>
+                    </div>
+                    {question.imageUrl ? (
+                      <img
+                        src={question.imageUrl}
+                        alt="Vista previa de la pregunta"
+                        className="max-h-48 rounded border object-contain"
+                      />
+                    ) : null}
+                  </div>
 
                   <div className="flex gap-2">
+                    <BaseModal
+                      open={editingQuestionId === question.id}
+                      onOpenChange={(open) =>
+                        setEditingQuestionId(open ? question.id : null)
+                      }
+                      title="Editar pregunta"
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy || uploadingImage}
+                          onClick={() => {
+                            setEditStatements((prev) => ({
+                              ...prev,
+                              [question.id]: question.statement,
+                            }));
+                            setEditTopicIds((prev) => ({
+                              ...prev,
+                              [question.id]: question.topicId,
+                            }));
+                            setEditImageUrls((prev) => ({
+                              ...prev,
+                              [question.id]: question.imageUrl ?? "",
+                            }));
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      }
+                    >
+                      <form
+                        className="space-y-3"
+                        onSubmit={async (event) => {
+                          event.preventDefault();
+                          const didUpdate = await handleUpdateQuestion(question, {
+                            topicId: editedTopicId,
+                            statement: editedStatement,
+                            imageUrl: editedImageUrl || null,
+                          });
+                          if (didUpdate) {
+                            setEditingQuestionId(null);
+                          }
+                        }}
+                      >
+                        <QuestionDetailsFormFields
+                          prefix={`edit-question-${question.id}`}
+                          topicId={editedTopicId}
+                          statement={editedStatement}
+                          imageUrl={editedImageUrl}
+                          availableTopics={availableTopics}
+                          disabled={busy}
+                          uploadingImage={uploadingImage}
+                          onTopicChange={(value) =>
+                            setEditTopicIds((prev) => ({
+                              ...prev,
+                              [question.id]: value,
+                            }))
+                          }
+                          onStatementChange={(value) =>
+                            setEditStatements((prev) => ({
+                              ...prev,
+                              [question.id]: value,
+                            }))
+                          }
+                          onImageUrlChange={(value) =>
+                            setEditImageUrls((prev) => ({
+                              ...prev,
+                              [question.id]: value,
+                            }))
+                          }
+                          onUploadImage={(file) => handleRowImageUpload(question.id, file)}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={busy || uploadingImage || !hasChanges}
+                        >
+                          {busy ? "Guardando..." : "Guardar cambios"}
+                        </Button>
+                      </form>
+                    </BaseModal>
                     <Button asChild type="button" variant="outline" disabled={busy || uploadingImage}>
                       <Link href={`/protected/admin/questions/${question.id}/options`}>
                         Gestionar opciones
                       </Link>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy || uploadingImage || !hasChanges}
-                      onClick={() =>
-                        handleUpdateQuestion(question, {
-                          topicId: editedTopicId,
-                          statement: editedStatement,
-                          imageUrl: editedImageUrl || null,
-                        })
-                      }
-                    >
-                      Guardar
                     </Button>
                     <Button
                       type="button"
