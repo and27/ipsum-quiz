@@ -1,4 +1,5 @@
 import type {
+  FinishAttemptResponse,
   SaveAttemptAnswerResponse,
   StudentExamQuestion,
   StudentExamQuestionOption,
@@ -20,6 +21,7 @@ export type StudentAttemptErrorCode =
   | "active_attempt_not_found"
   | "attempt_not_found"
   | "attempt_not_active"
+  | "attempt_already_closed"
   | "answer_not_found"
   | "option_not_found"
   | "attempt_expired";
@@ -61,6 +63,14 @@ interface RawAnswerRow {
 interface RawSaveAnswerRow {
   selected_option_id: string | null;
   answered_at: string | null;
+}
+
+interface RawScoreRow {
+  simulator_version_question_id: string;
+  selected_option_id: string | null;
+  question_topic_id: string;
+  topic_name: string | null;
+  correct_option_id: string | null;
 }
 
 interface RawExamQuestionOptionRow {
@@ -547,6 +557,152 @@ export async function getAttemptExamStateForStudent(input: {
     questionsTotal: attemptRow.questions_total,
     currentQuestionIndex,
     questions: mergedQuestions,
+  };
+}
+
+export async function finishAttemptForStudent(input: {
+  attemptId: string;
+  studentId: string;
+}): Promise<FinishAttemptResponse> {
+  const supabase = await createClient();
+  const { data: attemptRow, error: attemptError } = await supabase
+    .from("attempts")
+    .select("id, student_id, status, questions_total")
+    .eq("id", input.attemptId)
+    .maybeSingle();
+
+  if (attemptError) {
+    throw new Error(attemptError.message);
+  }
+  if (!attemptRow || attemptRow.student_id !== input.studentId) {
+    throw new StudentAttemptError("attempt_not_found", "Attempt was not found.");
+  }
+  if (attemptRow.status === "finished" || attemptRow.status === "expired") {
+    throw new StudentAttemptError(
+      "attempt_already_closed",
+      "Attempt is already closed.",
+    );
+  }
+  if (attemptRow.status !== "active") {
+    throw new StudentAttemptError("attempt_not_active", "Attempt is no longer active.");
+  }
+
+  const { data: scoreRows, error: scoreError } = await supabase.rpc(
+    "get_attempt_score_rows",
+    {
+      p_attempt_id: input.attemptId,
+    },
+  );
+
+  if (scoreError) {
+    throw new Error(scoreError.message);
+  }
+
+  const rows = (scoreRows ?? []) as RawScoreRow[];
+  const topicMap = new Map<
+    string,
+    { topicId: string; topicName: string; totalCount: number; correctCount: number }
+  >();
+  let scoreTotal = 0;
+
+  for (const row of rows) {
+    if (
+      typeof row.simulator_version_question_id !== "string" ||
+      typeof row.question_topic_id !== "string"
+    ) {
+      continue;
+    }
+    const selectedOptionId =
+      row.selected_option_id && typeof row.selected_option_id === "string"
+        ? row.selected_option_id
+        : null;
+    const correctOptionId =
+      row.correct_option_id && typeof row.correct_option_id === "string"
+        ? row.correct_option_id
+        : null;
+    const isCorrect = !!selectedOptionId && !!correctOptionId && selectedOptionId === correctOptionId;
+
+    const key = row.question_topic_id;
+    const current = topicMap.get(key) ?? {
+      topicId: key,
+      topicName:
+        row.topic_name && typeof row.topic_name === "string" ? row.topic_name : key,
+      totalCount: 0,
+      correctCount: 0,
+    };
+    current.totalCount += 1;
+    if (isCorrect) {
+      current.correctCount += 1;
+      scoreTotal += 1;
+    }
+    topicMap.set(key, current);
+  }
+
+  const topicScores = Array.from(topicMap.values());
+
+  const { error: deleteTopicScoresError } = await supabase
+    .from("attempt_topic_scores")
+    .delete()
+    .eq("attempt_id", input.attemptId);
+  if (deleteTopicScoresError) {
+    throw new Error(deleteTopicScoresError.message);
+  }
+
+  if (topicScores.length > 0) {
+    const { error: insertTopicScoresError } = await supabase
+      .from("attempt_topic_scores")
+      .insert(
+        topicScores.map((topic) => ({
+          attempt_id: input.attemptId,
+          topic_id: topic.topicId,
+          correct_count: topic.correctCount,
+          total_count: topic.totalCount,
+        })),
+      );
+    if (insertTopicScoresError) {
+      throw new Error(insertTopicScoresError.message);
+    }
+  }
+
+  const { error: updateAnswersError } = await supabase.rpc("set_attempt_answers_correctness", {
+    p_attempt_id: input.attemptId,
+  });
+  if (updateAnswersError) {
+    throw new Error(updateAnswersError.message);
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: finishedAttempt, error: finishError } = await supabase
+    .from("attempts")
+    .update({
+      status: "finished",
+      finished_at: nowIso,
+      score_total: scoreTotal,
+    })
+    .eq("id", input.attemptId)
+    .eq("status", "active")
+    .select("id, status, score_total, questions_total")
+    .maybeSingle();
+
+  if (finishError) {
+    throw new Error(finishError.message);
+  }
+  if (!finishedAttempt || finishedAttempt.status !== "finished") {
+    throw new StudentAttemptError(
+      "attempt_not_active",
+      "Attempt is no longer active.",
+    );
+  }
+
+  return {
+    attemptId: finishedAttempt.id,
+    status: "finished",
+    scoreTotal: typeof finishedAttempt.score_total === "number" ? finishedAttempt.score_total : scoreTotal,
+    questionsTotal:
+      typeof finishedAttempt.questions_total === "number"
+        ? finishedAttempt.questions_total
+        : attemptRow.questions_total,
+    topicScores,
   };
 }
 

@@ -41,6 +41,12 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     Math.max(0, Math.floor((Date.parse(initialState.expiresAt) - Date.now()) / 1000)),
   );
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishResult, setFinishResult] = useState<{
+    scoreTotal: number;
+    questionsTotal: number;
+    topicScores: Array<{ topicName: string; correctCount: number; totalCount: number }>;
+  } | null>(null);
 
   useEffect(() => {
     const timerId = setInterval(() => {
@@ -85,11 +91,63 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
     }
   }
 
+  async function finishAttempt() {
+    setErrorMessage(null);
+    setIsFinishing(true);
+    try {
+      const payload = await parseApiResponse<{
+        scoreTotal: number;
+        questionsTotal: number;
+        topicScores: Array<{
+          topicName: string;
+          correctCount: number;
+          totalCount: number;
+        }>;
+      }>(
+        await fetch(`/api/student/attempts/${initialState.attemptId}/finish`, {
+          method: "POST",
+        }),
+      );
+      setFinishResult(payload);
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to finish attempt.",
+      );
+    } finally {
+      setIsFinishing(false);
+    }
+  }
+
   if (!currentQuestion) {
     return (
       <Card>
         <CardContent className="py-6 text-sm text-muted-foreground">
           No questions available for this attempt.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (finishResult) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Resultado</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm">
+            Puntaje: {finishResult.scoreTotal}/{finishResult.questionsTotal}
+          </p>
+          <div className="space-y-1">
+            {finishResult.topicScores.map((topic) => (
+              <p key={topic.topicName} className="text-sm text-muted-foreground">
+                {topic.topicName}: {topic.correctCount}/{topic.totalCount}
+              </p>
+            ))}
+          </div>
+          <Button type="button" onClick={() => (window.location.href = "/protected/student/simulators")}>
+            Volver a simuladores
+          </Button>
         </CardContent>
       </Card>
     );
@@ -152,12 +210,15 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
             >
               Siguiente
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={finishAttempt}
+              disabled={isExpired || isFinishing}
+            >
+              {isFinishing ? "Finalizando..." : "Finalizar intento"}
+            </Button>
           </div>
-          {currentIndex >= questions.length - 1 ? (
-            <p className="text-xs text-muted-foreground">
-              Ultima pregunta. La finalizacion manual se implementa en el siguiente ticket.
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -197,4 +258,3 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
     </div>
   );
 }
-

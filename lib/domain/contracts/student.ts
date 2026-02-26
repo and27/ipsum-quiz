@@ -4,6 +4,7 @@ import type {
   PaginatedResult,
   UUID,
 } from "@/lib/domain/common";
+import type { TopicScore } from "@/lib/domain/simulator";
 
 export interface StudentVisibleSimulator {
   id: UUID;
@@ -96,6 +97,7 @@ export interface FinishAttemptResponse {
   status: "finished" | "expired";
   scoreTotal: number;
   questionsTotal: number;
+  topicScores: TopicScore[];
 }
 
 export type StudentAttemptHistoryResponse = PaginatedResult<AttemptSummary>;
