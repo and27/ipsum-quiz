@@ -52,12 +52,6 @@ export async function PATCH(
     payloadForLog = payload;
 
     const simulator = await updateSimulator(simulatorId, payload);
-    console.info("[api/admin/simulators/:id PATCH] updated", {
-      simulatorId,
-      payload: payloadForLog,
-      hasAccessCode: simulator.hasAccessCode,
-      accessCode: simulator.accessCode ?? null,
-    });
     return NextResponse.json({ simulator });
   } catch (error) {
     const authResponse = mapAuthGuardErrorToResponse(error);

@@ -50,7 +50,14 @@ async function ProtectedLayoutContent({
               </span>
             </div>
             <Suspense>
-              <AuthButton />
+              <AuthButton
+                session={{
+                  userId: session.userId,
+                  email: session.email,
+                  profile: session.profile,
+                  role: session.role,
+                }}
+              />
             </Suspense>
           </div>
         </nav>

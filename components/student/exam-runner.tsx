@@ -35,17 +35,26 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
 
 export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   const [questions, setQuestions] = useState(initialState.questions);
-  const [currentIndex, setCurrentIndex] = useState(initialState.currentQuestionIndex);
+  const [currentIndex, setCurrentIndex] = useState(
+    initialState.currentQuestionIndex,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
-    Math.max(0, Math.floor((Date.parse(initialState.expiresAt) - Date.now()) / 1000)),
+    Math.max(
+      0,
+      Math.floor((Date.parse(initialState.expiresAt) - Date.now()) / 1000),
+    ),
   );
   const [isFinishing, setIsFinishing] = useState(false);
   const saveRequestVersionRef = useRef<Record<string, number>>({});
   const [finishResult, setFinishResult] = useState<{
     scoreTotal: number;
     questionsTotal: number;
-    topicScores: Array<{ topicName: string; correctCount: number; totalCount: number }>;
+    topicScores: Array<{
+      topicName: string;
+      correctCount: number;
+      totalCount: number;
+    }>;
   } | null>(null);
 
   useEffect(() => {
@@ -58,21 +67,28 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   const isExpired = remainingSeconds <= 0;
   const currentQuestion = questions[currentIndex];
   const answeredCount = useMemo(
-    () => questions.filter((question) => question.selectedOptionId !== null).length,
+    () =>
+      questions.filter((question) => question.selectedOptionId !== null).length,
     [questions],
   );
 
-  async function saveAnswer(questionId: string, selectedOptionId: string | null) {
+  async function saveAnswer(
+    questionId: string,
+    selectedOptionId: string | null,
+  ) {
     setErrorMessage(null);
     const previousSelectedOptionId =
-      questions.find((question) => question.id === questionId)?.selectedOptionId ?? null;
+      questions.find((question) => question.id === questionId)
+        ?.selectedOptionId ?? null;
     const requestVersion = (saveRequestVersionRef.current[questionId] ?? 0) + 1;
     saveRequestVersionRef.current[questionId] = requestVersion;
 
     // Optimistic UI: reflect selection instantly.
     setQuestions((prev) =>
       prev.map((question) =>
-        question.id === questionId ? { ...question, selectedOptionId } : question,
+        question.id === questionId
+          ? { ...question, selectedOptionId }
+          : question,
       ),
     );
     try {
@@ -97,7 +113,9 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
         );
       }
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo guardar la respuesta.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la respuesta.",
       );
     }
   }
@@ -122,7 +140,9 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
       setFinishResult(payload);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo finalizar el intento.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo finalizar el intento.",
       );
     } finally {
       setIsFinishing(false);
@@ -151,12 +171,20 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
           </p>
           <div className="space-y-1">
             {finishResult.topicScores.map((topic) => (
-              <p key={topic.topicName} className="text-sm text-muted-foreground">
+              <p
+                key={topic.topicName}
+                className="text-sm text-muted-foreground"
+              >
                 {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
           </div>
-          <Button type="button" onClick={() => (window.location.href = "/protected/student/simulators")}>
+          <Button
+            type="button"
+            onClick={() =>
+              (window.location.href = "/protected/student/simulators")
+            }
+          >
             Volver a simuladores
           </Button>
         </CardContent>
@@ -180,7 +208,16 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
           <CardTitle className="text-xl">{currentQuestion.statement}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className="text-sm text-red-500">{errorMessage}</p>
+          ) : null}
+          {currentQuestion.imageUrl ? (
+            <img
+              src={currentQuestion.imageUrl}
+              alt="Imagen de la pregunta"
+              className="max-h-80 w-full rounded-md border object-contain"
+            />
+          ) : null}
           <div className="space-y-2">
             {currentQuestion.options.map((option) => {
               const isSelected = currentQuestion.selectedOptionId === option.id;
@@ -196,7 +233,16 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                   onClick={() => saveAnswer(currentQuestion.id, option.id)}
                   disabled={isExpired}
                 >
-                  {option.position}. {option.text}
+                  <span className="block">
+                    {option.position}. {option.text}
+                  </span>
+                  {option.imageUrl ? (
+                    <img
+                      src={option.imageUrl}
+                      alt={`Imagen de la opcion ${option.position}`}
+                      className="mt-2 max-h-48 w-full rounded border object-contain"
+                    />
+                  ) : null}
                 </button>
               );
             })}
@@ -206,16 +252,17 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
               type="button"
               variant="outline"
               onClick={() => saveAnswer(currentQuestion.id, null)}
-              disabled={
-                isExpired ||
-                currentQuestion.selectedOptionId === null
-              }
+              disabled={isExpired || currentQuestion.selectedOptionId === null}
             >
               Limpiar respuesta
             </Button>
             <Button
               type="button"
-              onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, questions.length - 1))}
+              onClick={() =>
+                setCurrentIndex((prev) =>
+                  Math.min(prev + 1, questions.length - 1),
+                )
+              }
               disabled={isExpired || currentIndex >= questions.length - 1}
             >
               Siguiente
@@ -260,12 +307,8 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Este tablero no permite navegar hacia atras.
-          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-

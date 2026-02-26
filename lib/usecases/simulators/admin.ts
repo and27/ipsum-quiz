@@ -329,25 +329,9 @@ export async function listSimulators(
   }
 
   const rows = (data ?? []) as RawSimulatorRow[];
-  console.info("[admin/simulators:list] raw rows", {
-    totalRows: rows.length,
-    sample: rows.slice(0, 3).map((row) => ({
-      id: row.id,
-      hasHash: !!row.access_code_hash,
-      plaintext: row.access_code_plaintext ?? null,
-    })),
-  });
   const items = rows
     .map((row) => parseSimulatorRow(row))
     .filter((row): row is Simulator => !!row);
-  console.info("[admin/simulators:list] parsed rows", {
-    totalItems: items.length,
-    sample: items.slice(0, 3).map((item) => ({
-      id: item.id,
-      hasAccessCode: item.hasAccessCode,
-      accessCode: item.accessCode ?? null,
-    })),
-  });
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -404,11 +388,6 @@ export async function createSimulator(
     throw new Error(error.message);
   }
 
-  console.info("[admin/simulators:create] inserted row", {
-    id: (data as RawSimulatorRow | null)?.id ?? null,
-    hasHash: !!(data as RawSimulatorRow | null)?.access_code_hash,
-    plaintext: (data as RawSimulatorRow | null)?.access_code_plaintext ?? null,
-  });
   const simulator = parseSimulatorRow(data);
   if (!simulator) {
     console.error("[admin/simulators:create] parse failed", { data });
@@ -486,13 +465,6 @@ export async function updateSimulator(
     throw new SimulatorInputError("not_found", "Simulator was not found.");
   }
 
-  console.info("[admin/simulators:update] updated row", {
-    simulatorId,
-    hasHash: (data as RawSimulatorRow).access_code_hash
-      ? true
-      : false,
-    plaintext: (data as RawSimulatorRow).access_code_plaintext ?? null,
-  });
   const simulator = parseSimulatorRow(data);
   if (!simulator) {
     console.error("[admin/simulators:update] parse failed", { simulatorId, data });

@@ -2,9 +2,14 @@ import Link from "next/link";
 import { Button } from "./ui/button";
 import { LogoutButton } from "./logout-button";
 import { getCurrentSessionContext } from "@/lib/usecases/auth";
+import type { SessionContext } from "@/lib/domain/auth";
 
-export async function AuthButton() {
-  const session = await getCurrentSessionContext();
+interface AuthButtonProps {
+  session?: SessionContext;
+}
+
+export async function AuthButton({ session: initialSession }: AuthButtonProps) {
+  const session = initialSession ?? (await getCurrentSessionContext());
 
   return session.userId ? (
     <div className="flex items-center gap-4">
