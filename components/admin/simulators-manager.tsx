@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 interface SimulatorsManagerProps {
@@ -427,6 +428,11 @@ export function SimulatorsManager({
                   </label>
 
                   <div className="flex flex-wrap gap-2">
+                    <Button asChild type="button" variant="outline" disabled={busy}>
+                      <Link href={`/protected/admin/simulators/${simulator.id}/builder`}>
+                        Open builder
+                      </Link>
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"

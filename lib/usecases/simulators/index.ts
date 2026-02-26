@@ -7,4 +7,12 @@ export {
   updateSimulator,
   verifyAccessCode,
 } from "./admin";
-
+export {
+  addQuestionToDraftVersion,
+  getSimulatorBuilderState,
+  removeQuestionFromDraftVersion,
+  reorderDraftVersionQuestion,
+  SimulatorBuilderError,
+  type SimulatorBuilderErrorCode,
+  validateDraftVersionBeforePublish,
+} from "./builder";

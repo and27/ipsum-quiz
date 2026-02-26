@@ -1,5 +1,11 @@
 import type { PaginatedResult } from "@/lib/domain/common";
-import type { Simulator, SimulatorStatus } from "@/lib/domain/simulator";
+import type {
+  Simulator,
+  SimulatorPublishValidation,
+  SimulatorStatus,
+  SimulatorVersion,
+  SimulatorVersionQuestion,
+} from "@/lib/domain/simulator";
 
 export interface AdminSimulatorsListQuery {
   page?: number;
@@ -32,3 +38,25 @@ export interface AdminSimulatorResponse {
   simulator: Simulator;
 }
 
+export interface AdminSimulatorBuilderStateResponse {
+  simulator: Simulator;
+  draftVersion: SimulatorVersion;
+  items: SimulatorVersionQuestion[];
+}
+
+export interface AdminSimulatorBuilderAddQuestionRequest {
+  sourceQuestionId: string;
+  position?: number;
+}
+
+export interface AdminSimulatorBuilderReorderQuestionRequest {
+  position: number;
+}
+
+export interface AdminSimulatorBuilderQuestionResponse {
+  item: SimulatorVersionQuestion;
+}
+
+export interface AdminSimulatorPublishValidationResponse {
+  validation: SimulatorPublishValidation;
+}
