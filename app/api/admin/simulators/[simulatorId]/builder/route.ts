@@ -85,6 +85,9 @@ export async function POST(
       if (error.code === "simulator_not_found" || error.code === "question_not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
+      if (error.code === "version_locked") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       if (error.code === "duplicate_question") {
         return NextResponse.json({ error: error.message }, { status: 409 });
       }
@@ -97,4 +100,3 @@ export async function POST(
     );
   }
 }
-

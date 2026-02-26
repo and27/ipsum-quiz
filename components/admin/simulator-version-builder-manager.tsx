@@ -45,7 +45,9 @@ export function SimulatorVersionBuilderManager({
   availableQuestions,
 }: SimulatorVersionBuilderManagerProps) {
   const [items, setItems] = useState<SimulatorVersionQuestion[]>(initialState.items);
-  const [draftVersionNumber] = useState(initialState.draftVersion.versionNumber);
+  const [activeVersion, setActiveVersion] = useState(initialState.activeVersion);
+  const [isEditable, setIsEditable] = useState(initialState.isEditable);
+  const [lockReason, setLockReason] = useState(initialState.lockReason);
   const [editPositions, setEditPositions] = useState<Record<string, string>>(
     () => buildEditPositions(initialState.items),
   );
@@ -80,6 +82,9 @@ export function SimulatorVersionBuilderManager({
     const payload = await parseApiResponse<AdminSimulatorBuilderStateResponse>(response);
     setItems(payload.items);
     setEditPositions(buildEditPositions(payload.items));
+    setActiveVersion(payload.activeVersion);
+    setIsEditable(payload.isEditable);
+    setLockReason(payload.lockReason);
   }
 
   async function handleAddQuestion(event: React.FormEvent<HTMLFormElement>) {
@@ -224,9 +229,17 @@ export function SimulatorVersionBuilderManager({
     <div className="flex w-full flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Draft Builder (v{draftVersionNumber})</CardTitle>
+          <CardTitle>
+            Version Builder{" "}
+            {activeVersion ? `(v${activeVersion.versionNumber} - ${activeVersion.status})` : ""}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {!isEditable && lockReason ? (
+            <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm text-amber-800">{lockReason}</p>
+            </div>
+          ) : null}
           <form onSubmit={handleAddQuestion} className="space-y-3">
             <div className="space-y-1">
               <label htmlFor="builder-source-question" className="text-sm font-medium">
@@ -237,7 +250,7 @@ export function SimulatorVersionBuilderManager({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                 value={selectedQuestionId}
                 onChange={(event) => setSelectedQuestionId(event.target.value)}
-                disabled={isAdding || availableToAdd.length === 0}
+                disabled={isAdding || availableToAdd.length === 0 || !isEditable}
               >
                 {availableToAdd.map((question) => (
                   <option key={question.id} value={question.id}>
@@ -256,10 +269,13 @@ export function SimulatorVersionBuilderManager({
                 min={1}
                 value={newQuestionPosition}
                 onChange={(event) => setNewQuestionPosition(event.target.value)}
-                disabled={isAdding}
+                disabled={isAdding || !isEditable}
               />
             </div>
-            <Button type="submit" disabled={isAdding || availableToAdd.length === 0}>
+            <Button
+              type="submit"
+              disabled={isAdding || availableToAdd.length === 0 || !isEditable}
+            >
               {isAdding ? "Adding..." : "Add question"}
             </Button>
           </form>
@@ -304,12 +320,17 @@ export function SimulatorVersionBuilderManager({
                           [item.id]: event.target.value,
                         }))
                       }
-                      disabled={busy}
+                      disabled={busy || !isEditable}
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || !Number.isFinite(nextPosition) || nextPosition <= 0}
+                      disabled={
+                        busy ||
+                        !isEditable ||
+                        !Number.isFinite(nextPosition) ||
+                        nextPosition <= 0
+                      }
                       onClick={() => handleReorder(item, nextPosition)}
                     >
                       Move
@@ -317,7 +338,7 @@ export function SimulatorVersionBuilderManager({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || index === 0}
+                      disabled={busy || !isEditable || index === 0}
                       onClick={() => handleReorder(item, item.position - 1)}
                     >
                       Up
@@ -325,7 +346,7 @@ export function SimulatorVersionBuilderManager({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={busy || index === items.length - 1}
+                      disabled={busy || !isEditable || index === items.length - 1}
                       onClick={() => handleReorder(item, item.position + 1)}
                     >
                       Down
@@ -333,7 +354,7 @@ export function SimulatorVersionBuilderManager({
                     <Button
                       type="button"
                       variant="destructive"
-                      disabled={busy}
+                      disabled={busy || !isEditable}
                       onClick={() => handleDelete(item)}
                     >
                       Remove

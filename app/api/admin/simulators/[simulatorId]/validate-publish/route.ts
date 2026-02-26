@@ -27,7 +27,7 @@ export async function POST(
     }
 
     if (error instanceof SimulatorBuilderError) {
-      if (error.code === "simulator_not_found") {
+      if (error.code === "simulator_not_found" || error.code === "draft_not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -39,4 +39,3 @@ export async function POST(
     );
   }
 }
-

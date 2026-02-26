@@ -40,7 +40,10 @@ export interface AdminSimulatorResponse {
 
 export interface AdminSimulatorBuilderStateResponse {
   simulator: Simulator;
-  draftVersion: SimulatorVersion;
+  activeVersion: SimulatorVersion | null;
+  draftVersion: SimulatorVersion | null;
+  isEditable: boolean;
+  lockReason: string | null;
   items: SimulatorVersionQuestion[];
 }
 

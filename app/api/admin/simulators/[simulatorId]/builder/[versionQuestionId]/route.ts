@@ -47,6 +47,9 @@ export async function PATCH(
       if (error.code === "simulator_not_found" || error.code === "not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
+      if (error.code === "version_locked") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -80,6 +83,9 @@ export async function DELETE(
       if (error.code === "simulator_not_found" || error.code === "not_found") {
         return NextResponse.json({ error: error.message }, { status: 404 });
       }
+      if (error.code === "version_locked") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -89,4 +95,3 @@ export async function DELETE(
     );
   }
 }
-

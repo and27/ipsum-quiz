@@ -39,7 +39,7 @@ Goal: Constructor de simuladores con publish/snapshot/versionado.
 - [ ] V1-F2-003: Constructor de version borrador
 - [ ] V1-F2-004: Validaciones previas a publicar
 - [ ] V1-F2-005: Snapshot inmutable al publicar
-- [ ] V1-F2-006: Regla de edicion segun intentos
+- [x] V1-F2-006: Regla de edicion segun intentos
 - [ ] V1-F2-007: Duplicar version para correcciones (v2)
 - [ ] V1-F2-008: Publicacion/activacion y visibilidad estudiante
 

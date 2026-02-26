@@ -11,6 +11,7 @@ export type SimulatorBuilderErrorCode =
   | "simulator_not_found"
   | "version_not_found"
   | "draft_not_found"
+  | "version_locked"
   | "question_not_found"
   | "question_not_eligible"
   | "invalid_position"
@@ -277,6 +278,28 @@ async function getOrCreateDraftVersion(simulatorId: string): Promise<SimulatorVe
   return parsedCreated;
 }
 
+async function getLatestPublishedVersion(
+  simulatorId: string,
+): Promise<SimulatorVersion | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("simulator_versions")
+    .select(
+      "id, simulator_id, version_number, status, created_from_version_id, published_at, has_attempts, created_at, updated_at",
+    )
+    .eq("simulator_id", simulatorId)
+    .eq("status", "published")
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return parseVersionRow(data as RawVersionRow);
+}
+
 async function getLatestDraftVersion(simulatorId: string): Promise<SimulatorVersion | null> {
   const supabase = await createClient();
   const { data: existingDraft, error: draftError } = await supabase
@@ -437,13 +460,73 @@ async function assertSourceQuestionEligible(sourceQuestionId: string): Promise<{
 
 export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   simulator: Simulator;
-  draftVersion: SimulatorVersion;
+  activeVersion: SimulatorVersion | null;
+  draftVersion: SimulatorVersion | null;
+  isEditable: boolean;
+  lockReason: string | null;
   items: SimulatorVersionQuestion[];
 }> {
   const simulator = await getSimulatorById(simulatorId);
-  const draftVersion = await getOrCreateDraftVersion(simulatorId);
-  const items = await listVersionQuestions(draftVersion.id);
-  return { simulator, draftVersion, items };
+  const draftVersion = await getLatestDraftVersion(simulatorId);
+  const publishedVersion = await getLatestPublishedVersion(simulatorId);
+  const activeVersion = draftVersion ?? publishedVersion;
+
+  let items: SimulatorVersionQuestion[] = [];
+  if (!activeVersion) {
+    const newDraft = await getOrCreateDraftVersion(simulatorId);
+    items = await listVersionQuestions(newDraft.id);
+    return {
+      simulator,
+      activeVersion: newDraft,
+      draftVersion: newDraft,
+      isEditable: true,
+      lockReason: null,
+      items,
+    };
+  }
+
+  items = await listVersionQuestions(activeVersion.id);
+  const isEditable = !activeVersion.hasAttempts;
+  const lockReason = isEditable
+    ? null
+    : "This version is locked because it already has student attempts. Duplicate it to continue editing.";
+
+  return {
+    simulator,
+    activeVersion,
+    draftVersion,
+    isEditable,
+    lockReason,
+    items,
+  };
+}
+
+async function getEditableVersionForMutations(
+  simulatorId: string,
+): Promise<SimulatorVersion> {
+  const draftVersion = await getLatestDraftVersion(simulatorId);
+  if (draftVersion) {
+    if (draftVersion.hasAttempts) {
+      throw new SimulatorBuilderError(
+        "version_locked",
+        "This draft version is locked because it already has student attempts.",
+      );
+    }
+    return draftVersion;
+  }
+
+  const publishedVersion = await getLatestPublishedVersion(simulatorId);
+  if (publishedVersion) {
+    if (publishedVersion.hasAttempts) {
+      throw new SimulatorBuilderError(
+        "version_locked",
+        "Published version has attempts. Duplicate this version to create a new editable draft.",
+      );
+    }
+    return publishedVersion;
+  }
+
+  return getOrCreateDraftVersion(simulatorId);
 }
 
 export async function addQuestionToDraftVersion(
@@ -451,7 +534,8 @@ export async function addQuestionToDraftVersion(
   sourceQuestionId: string,
   requestedPosition?: number,
 ): Promise<SimulatorVersionQuestion> {
-  const { draftVersion } = await getSimulatorBuilderState(simulatorId);
+  await getSimulatorById(simulatorId);
+  const editableVersion = await getEditableVersionForMutations(simulatorId);
   const source = await assertSourceQuestionEligible(sourceQuestionId);
 
   const supabase = await createClient();
@@ -459,7 +543,7 @@ export async function addQuestionToDraftVersion(
   const { data: duplicate, error: duplicateError } = await supabase
     .from("simulator_version_questions")
     .select("id")
-    .eq("simulator_version_id", draftVersion.id)
+    .eq("simulator_version_id", editableVersion.id)
     .eq("source_question_id", sourceQuestionId)
     .maybeSingle();
 
@@ -477,7 +561,7 @@ export async function addQuestionToDraftVersion(
   const { data: maxPositionRow, error: maxPositionError } = await supabase
     .from("simulator_version_questions")
     .select("position")
-    .eq("simulator_version_id", draftVersion.id)
+    .eq("simulator_version_id", editableVersion.id)
     .order("position", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -492,7 +576,7 @@ export async function addQuestionToDraftVersion(
   const { data: createdVersionQuestion, error: createError } = await supabase
     .from("simulator_version_questions")
     .insert({
-      simulator_version_id: draftVersion.id,
+      simulator_version_id: editableVersion.id,
       position: nextPosition,
       topic_id: source.topicId,
       statement: source.statement,
@@ -548,7 +632,7 @@ export async function addQuestionToDraftVersion(
       );
     }
 
-    const items = await listVersionQuestions(draftVersion.id);
+    const items = await listVersionQuestions(editableVersion.id);
     const ids = items.map((item) => item.id);
     const index = ids.indexOf(versionQuestionId);
     if (index !== -1) {
@@ -556,12 +640,12 @@ export async function addQuestionToDraftVersion(
     }
     const targetIndex = Math.min(normalizedPosition - 1, ids.length);
     ids.splice(targetIndex, 0, versionQuestionId);
-    await reorderByIds(draftVersion.id, ids);
+    await reorderByIds(editableVersion.id, ids);
   } else {
-    await normalizeVersionQuestionPositions(draftVersion.id);
+    await normalizeVersionQuestionPositions(editableVersion.id);
   }
 
-  const finalItems = await listVersionQuestions(draftVersion.id);
+  const finalItems = await listVersionQuestions(editableVersion.id);
   const created = finalItems.find((item) => item.id === versionQuestionId);
   if (!created) {
     throw new Error("Failed to load created version question.");
@@ -575,7 +659,8 @@ export async function reorderDraftVersionQuestion(
   versionQuestionId: string,
   position: number,
 ): Promise<SimulatorVersionQuestion> {
-  const { draftVersion } = await getSimulatorBuilderState(simulatorId);
+  await getSimulatorById(simulatorId);
+  const editableVersion = await getEditableVersionForMutations(simulatorId);
 
   if (!Number.isFinite(position) || Math.trunc(position) <= 0) {
     throw new SimulatorBuilderError(
@@ -584,7 +669,7 @@ export async function reorderDraftVersionQuestion(
     );
   }
 
-  const items = await listVersionQuestions(draftVersion.id);
+  const items = await listVersionQuestions(editableVersion.id);
   const ids = items.map((item) => item.id);
   const fromIndex = ids.indexOf(versionQuestionId);
   if (fromIndex === -1) {
@@ -595,9 +680,9 @@ export async function reorderDraftVersionQuestion(
   const targetIndex = Math.min(Math.trunc(position) - 1, ids.length);
   ids.splice(targetIndex, 0, versionQuestionId);
 
-  await reorderByIds(draftVersion.id, ids);
+  await reorderByIds(editableVersion.id, ids);
 
-  const finalItems = await listVersionQuestions(draftVersion.id);
+  const finalItems = await listVersionQuestions(editableVersion.id);
   const updated = finalItems.find((item) => item.id === versionQuestionId);
   if (!updated) {
     throw new SimulatorBuilderError("not_found", "Draft question was not found.");
@@ -610,13 +695,14 @@ export async function removeQuestionFromDraftVersion(
   simulatorId: string,
   versionQuestionId: string,
 ): Promise<void> {
-  const { draftVersion } = await getSimulatorBuilderState(simulatorId);
+  await getSimulatorById(simulatorId);
+  const editableVersion = await getEditableVersionForMutations(simulatorId);
   const supabase = await createClient();
 
   const { data: deletedRow, error: deleteError } = await supabase
     .from("simulator_version_questions")
     .delete()
-    .eq("simulator_version_id", draftVersion.id)
+    .eq("simulator_version_id", editableVersion.id)
     .eq("id", versionQuestionId)
     .select("id")
     .maybeSingle();
@@ -628,7 +714,7 @@ export async function removeQuestionFromDraftVersion(
     throw new SimulatorBuilderError("not_found", "Draft question was not found.");
   }
 
-  await normalizeVersionQuestionPositions(draftVersion.id);
+  await normalizeVersionQuestionPositions(editableVersion.id);
 }
 
 function validateOrderContiguous(
@@ -653,7 +739,15 @@ function validateOrderContiguous(
 export async function validateDraftVersionBeforePublish(
   simulatorId: string,
 ): Promise<SimulatorPublishValidation> {
-  const { draftVersion, items } = await getSimulatorBuilderState(simulatorId);
+  await getSimulatorById(simulatorId);
+  const draftVersion = await getLatestDraftVersion(simulatorId);
+  if (!draftVersion) {
+    throw new SimulatorBuilderError(
+      "draft_not_found",
+      "No draft version found to validate.",
+    );
+  }
+  const items = await listVersionQuestions(draftVersion.id);
   const issues: PublishValidationIssue[] = [];
 
   if (items.length === 0) {
