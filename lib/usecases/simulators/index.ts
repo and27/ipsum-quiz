@@ -9,6 +9,7 @@ export {
 } from "./admin";
 export {
   addQuestionToDraftVersion,
+  duplicatePublishedVersionToDraft,
   getSimulatorBuilderState,
   publishDraftVersion,
   removeQuestionFromDraftVersion,

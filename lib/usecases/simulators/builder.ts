@@ -10,7 +10,9 @@ import { createClient } from "@/lib/supabase/server";
 export type SimulatorBuilderErrorCode =
   | "simulator_not_found"
   | "version_not_found"
+  | "published_version_not_found"
   | "draft_not_found"
+  | "draft_already_exists"
   | "version_locked"
   | "question_not_found"
   | "question_not_eligible"
@@ -462,6 +464,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   simulator: Simulator;
   activeVersion: SimulatorVersion | null;
   draftVersion: SimulatorVersion | null;
+  publishedVersion: SimulatorVersion | null;
   isEditable: boolean;
   lockReason: string | null;
   items: SimulatorVersionQuestion[];
@@ -479,6 +482,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
       simulator,
       activeVersion: newDraft,
       draftVersion: newDraft,
+      publishedVersion,
       isEditable: true,
       lockReason: null,
       items,
@@ -495,6 +499,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
     simulator,
     activeVersion,
     draftVersion,
+    publishedVersion,
     isEditable,
     lockReason,
     items,
@@ -880,5 +885,127 @@ export async function publishDraftVersion(simulatorId: string): Promise<{
     simulator: updatedSimulator,
     publishedVersion,
     validation,
+  };
+}
+
+export async function duplicatePublishedVersionToDraft(simulatorId: string): Promise<{
+  draftVersion: SimulatorVersion;
+  copiedQuestions: number;
+}> {
+  await getSimulatorById(simulatorId);
+
+  const existingDraft = await getLatestDraftVersion(simulatorId);
+  if (existingDraft) {
+    throw new SimulatorBuilderError(
+      "draft_already_exists",
+      "There is already an editable draft for this simulator.",
+    );
+  }
+
+  const sourceVersion = await getLatestPublishedVersion(simulatorId);
+  if (!sourceVersion) {
+    throw new SimulatorBuilderError(
+      "published_version_not_found",
+      "No published version was found to duplicate.",
+    );
+  }
+
+  const supabase = await createClient();
+
+  const { data: latestVersion, error: latestVersionError } = await supabase
+    .from("simulator_versions")
+    .select("version_number")
+    .eq("simulator_id", simulatorId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestVersionError) {
+    throw new Error(latestVersionError.message);
+  }
+
+  const nextVersion =
+    typeof latestVersion?.version_number === "number"
+      ? latestVersion.version_number + 1
+      : 1;
+
+  const { data: draftRow, error: createDraftError } = await supabase
+    .from("simulator_versions")
+    .insert({
+      simulator_id: simulatorId,
+      version_number: nextVersion,
+      status: "draft",
+      created_from_version_id: sourceVersion.id,
+    })
+    .select(
+      "id, simulator_id, version_number, status, created_from_version_id, published_at, has_attempts, created_at, updated_at",
+    )
+    .single();
+
+  if (createDraftError) {
+    throw new Error(createDraftError.message);
+  }
+
+  const draftVersion = parseVersionRow(draftRow as RawVersionRow);
+  if (!draftVersion) {
+    throw new Error("Invalid draft version payload returned from database.");
+  }
+
+  const sourceQuestions = await listVersionQuestions(sourceVersion.id);
+  let copiedQuestions = 0;
+
+  for (const sourceQuestion of sourceQuestions) {
+    const { data: insertedQuestion, error: insertQuestionError } = await supabase
+      .from("simulator_version_questions")
+      .insert({
+        simulator_version_id: draftVersion.id,
+        position: sourceQuestion.position,
+        topic_id: sourceQuestion.topicId,
+        statement: sourceQuestion.statement,
+        image_url: sourceQuestion.imageUrl,
+        source_question_id: sourceQuestion.sourceQuestionId,
+      })
+      .select("id")
+      .single();
+
+    if (insertQuestionError) {
+      throw new Error(insertQuestionError.message);
+    }
+
+    const newVersionQuestionId = insertedQuestion.id as string;
+    const { data: sourceOptions, error: sourceOptionsError } = await supabase
+      .from("simulator_version_question_options")
+      .select("position, text, image_url, is_correct")
+      .eq("simulator_version_question_id", sourceQuestion.id)
+      .order("position", { ascending: true });
+
+    if (sourceOptionsError) {
+      throw new Error(sourceOptionsError.message);
+    }
+
+    const optionRows = (sourceOptions ?? []).map((option) => ({
+      simulator_version_question_id: newVersionQuestionId,
+      position: option.position,
+      text: option.text,
+      image_url: option.image_url,
+      is_correct: option.is_correct,
+    }));
+
+    if (optionRows.length > 0) {
+      const { error: insertOptionsError } = await supabase
+        .from("simulator_version_question_options")
+        .insert(optionRows);
+
+      if (insertOptionsError) {
+        throw new Error(insertOptionsError.message);
+      }
+    }
+
+    copiedQuestions += 1;
+  }
+
+  return {
+    draftVersion,
+    copiedQuestions,
   };
 }

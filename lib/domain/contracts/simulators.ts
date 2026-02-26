@@ -42,6 +42,7 @@ export interface AdminSimulatorBuilderStateResponse {
   simulator: Simulator;
   activeVersion: SimulatorVersion | null;
   draftVersion: SimulatorVersion | null;
+  publishedVersion: SimulatorVersion | null;
   isEditable: boolean;
   lockReason: string | null;
   items: SimulatorVersionQuestion[];
@@ -68,4 +69,9 @@ export interface AdminSimulatorPublishResponse {
   simulator: Simulator;
   publishedVersion: SimulatorVersion;
   validation: SimulatorPublishValidation;
+}
+
+export interface AdminSimulatorDuplicateVersionResponse {
+  draftVersion: SimulatorVersion;
+  copiedQuestions: number;
 }

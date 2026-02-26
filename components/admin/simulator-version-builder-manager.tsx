@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AdminSimulatorDuplicateVersionResponse,
   AdminSimulatorPublishResponse,
   AdminSimulatorBuilderStateResponse,
   AdminSimulatorPublishValidationResponse,
@@ -46,6 +47,8 @@ export function SimulatorVersionBuilderManager({
 }: SimulatorVersionBuilderManagerProps) {
   const [items, setItems] = useState<SimulatorVersionQuestion[]>(initialState.items);
   const [activeVersion, setActiveVersion] = useState(initialState.activeVersion);
+  const [draftVersion, setDraftVersion] = useState(initialState.draftVersion);
+  const [publishedVersion, setPublishedVersion] = useState(initialState.publishedVersion);
   const [isEditable, setIsEditable] = useState(initialState.isEditable);
   const [lockReason, setLockReason] = useState(initialState.lockReason);
   const [editPositions, setEditPositions] = useState<Record<string, string>>(
@@ -59,6 +62,7 @@ export function SimulatorVersionBuilderManager({
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [isValidating, setIsValidating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [validationResult, setValidationResult] = useState<
     AdminSimulatorPublishValidationResponse["validation"] | null
   >(null);
@@ -83,6 +87,8 @@ export function SimulatorVersionBuilderManager({
     setItems(payload.items);
     setEditPositions(buildEditPositions(payload.items));
     setActiveVersion(payload.activeVersion);
+    setDraftVersion(payload.draftVersion);
+    setPublishedVersion(payload.publishedVersion);
     setIsEditable(payload.isEditable);
     setLockReason(payload.lockReason);
   }
@@ -225,6 +231,31 @@ export function SimulatorVersionBuilderManager({
     }
   }
 
+  async function handleDuplicateVersion() {
+    setIsDuplicating(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setValidationResult(null);
+    try {
+      const response = await fetch(
+        `/api/admin/simulators/${simulatorId}/duplicate-version`,
+        { method: "POST" },
+      );
+      const payload =
+        await parseApiResponse<AdminSimulatorDuplicateVersionResponse>(response);
+      setSuccessMessage(
+        `Draft v${payload.draftVersion.versionNumber} created with ${payload.copiedQuestions} copied questions.`,
+      );
+      await loadState();
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to duplicate version.",
+      );
+    } finally {
+      setIsDuplicating(false);
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-6">
       <Card>
@@ -238,6 +269,16 @@ export function SimulatorVersionBuilderManager({
           {!isEditable && lockReason ? (
             <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
               <p className="text-sm text-amber-800">{lockReason}</p>
+              {publishedVersion && !draftVersion ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDuplicateVersion}
+                  disabled={isDuplicating}
+                >
+                  {isDuplicating ? "Duplicating..." : "Duplicate published version"}
+                </Button>
+              ) : null}
             </div>
           ) : null}
           <form onSubmit={handleAddQuestion} className="space-y-3">
@@ -381,18 +422,23 @@ export function SimulatorVersionBuilderManager({
             <Button
               type="button"
               onClick={handleValidateBeforePublish}
-              disabled={isValidating || isPublishing}
+              disabled={isValidating || isPublishing || !draftVersion}
             >
               {isValidating ? "Validating..." : "Run validation"}
             </Button>
             <Button
               type="button"
               onClick={handlePublishDraftVersion}
-              disabled={isPublishing || isValidating}
+              disabled={isPublishing || isValidating || !draftVersion}
             >
               {isPublishing ? "Publishing..." : "Publish draft version"}
             </Button>
           </div>
+          {!draftVersion ? (
+            <p className="text-xs text-muted-foreground">
+              No draft exists right now. Duplicate the published version to create one.
+            </p>
+          ) : null}
 
           {validationResult ? (
             <div className="space-y-2">
