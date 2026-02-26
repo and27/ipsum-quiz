@@ -34,7 +34,7 @@ async function ProtectedLayoutContent({
           <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 text-sm">
             <div className="flex items-center gap-4">
               <Link href="/" className="font-semibold">
-                Ipsum Quiz
+                Ipsum Solutio
               </Link>
               <span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
                 {isAdmin ? "Administrador" : "Estudiante"}
@@ -48,9 +48,7 @@ async function ProtectedLayoutContent({
 
         <div className="mx-auto flex w-full max-w-6xl flex-1 gap-5 p-5">
           {isAdmin ? <AdminSidebar /> : null}
-          <div className="flex min-w-0 flex-1 flex-col gap-6">
-            {children}
-          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
         </div>
       </div>
     </main>

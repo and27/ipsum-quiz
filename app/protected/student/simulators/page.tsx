@@ -24,10 +24,11 @@ async function StudentSimulatorsContent() {
     <div className="flex w-full flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold">Simuladores disponibles</h1>
-        <p className="text-sm text-muted-foreground">
-          Aqui solo se muestran simuladores publicados y activos.
-        </p>
-        <Link className="mt-1 inline-block text-sm underline" href="/protected/student/attempts">
+
+        <Link
+          className="mt-1 inline-block text-sm underline"
+          href="/protected/student/attempts"
+        >
           Ver historial de intentos
         </Link>
       </div>
@@ -39,7 +40,11 @@ async function StudentSimulatorsContent() {
 
 export default function StudentSimulatorsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
+    <Suspense
+      fallback={
+        <div className="text-sm text-muted-foreground">Cargando...</div>
+      }
+    >
       <StudentSimulatorsContent />
     </Suspense>
   );

@@ -29,8 +29,9 @@ export default function RootLayout({
       <body className={`${geistSans.className} antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="light"
           enableSystem
+          storageKey="ipsum-quiz-theme"
           disableTransitionOnChange
         >
           {children}
