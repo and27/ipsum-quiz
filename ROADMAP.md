@@ -49,7 +49,7 @@ Goal: Rendir simulador de punta a punta con temporizador y resultados.
 
 ### Tickets
 
-- [ ] V1-F3-001: Catalogo de simuladores para estudiante
+- [x] V1-F3-001: Catalogo de simuladores para estudiante
 - [ ] V1-F3-002: Rate limit de codigo de acceso
 - [ ] V1-F3-003: Inicio de intento transaccional
 - [ ] V1-F3-004: Reanudacion de intento activo

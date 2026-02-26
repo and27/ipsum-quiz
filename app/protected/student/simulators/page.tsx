@@ -36,7 +36,8 @@ async function StudentSimulatorsContent() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Duration: {simulator.durationMinutes} min | Attempts:{" "}
-              {simulator.maxAttempts}
+              {simulator.maxAttempts} | Access code:{" "}
+              {simulator.hasAccessCode ? "Required" : "Not required"}
             </p>
           </div>
         ))}
@@ -55,4 +56,3 @@ export default function StudentSimulatorsPage() {
     </Suspense>
   );
 }
-

@@ -1,5 +1,7 @@
-import type { StudentVisibleSimulatorsQuery } from "@/lib/domain/contracts";
-import type { Simulator } from "@/lib/domain/simulator";
+import type {
+  StudentVisibleSimulator,
+  StudentVisibleSimulatorsQuery,
+} from "@/lib/domain/contracts";
 import { createClient } from "@/lib/supabase/server";
 
 interface RawSimulatorRow {
@@ -18,7 +20,7 @@ interface RawSimulatorRow {
 }
 
 interface StudentVisibleSimulatorsResult {
-  items: Simulator[];
+  items: StudentVisibleSimulator[];
   page: number;
   pageSize: number;
   total: number;
@@ -39,7 +41,7 @@ function parsePageSize(value?: number): number {
   return Math.max(1, Math.min(100, Math.trunc(value)));
 }
 
-function parseSimulatorRow(row: RawSimulatorRow): Simulator | null {
+function parseSimulatorRow(row: RawSimulatorRow): StudentVisibleSimulator | null {
   if (
     typeof row.id !== "string" ||
     typeof row.title !== "string" ||
@@ -64,13 +66,7 @@ function parseSimulatorRow(row: RawSimulatorRow): Simulator | null {
     description: row.description,
     maxAttempts: row.max_attempts,
     durationMinutes: row.duration_minutes,
-    isActive: row.is_active,
-    status: row.status,
-    publishedVersionId: row.published_version_id,
     hasAccessCode: !!row.access_code_hash,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
@@ -100,7 +96,7 @@ export async function listVisibleSimulatorsForStudent(
 
   const items = ((data ?? []) as RawSimulatorRow[])
     .map((row) => parseSimulatorRow(row))
-    .filter((row): row is Simulator => !!row);
+    .filter((row): row is StudentVisibleSimulator => !!row);
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -112,4 +108,3 @@ export async function listVisibleSimulatorsForStudent(
     totalPages,
   };
 }
-
