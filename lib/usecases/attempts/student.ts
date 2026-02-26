@@ -1,5 +1,6 @@
 import type {
   FinishAttemptResponse,
+  FinishAttemptQuestionResult,
   SaveAttemptAnswerResponse,
   StudentAttemptHistoryResponse,
   StudentAttemptResultResponse,
@@ -101,6 +102,21 @@ interface TopicScoreAggregate {
   topicName: string;
   totalCount: number;
   correctCount: number;
+}
+
+interface RawAttemptAnswerDetailRow {
+  simulator_version_question_id: string;
+  selected_option_id: string | null;
+  is_correct: boolean | null;
+  simulator_version_questions:
+    | {
+        id?: unknown;
+        position?: unknown;
+        statement?: unknown;
+        topic_id?: unknown;
+        topics?: { name?: unknown } | Array<{ name?: unknown }> | null;
+      }
+    | null;
 }
 
 type DbClient = SupabaseClient;
@@ -548,6 +564,105 @@ async function closeAttemptWithScores(
   };
 }
 
+async function loadAttemptQuestionResults(
+  supabase: DbClient,
+  attemptId: string,
+): Promise<FinishAttemptQuestionResult[]> {
+  const { data: answerRows, error: answerError } = await supabase
+    .from("attempt_answers")
+    .select(
+      "simulator_version_question_id, selected_option_id, is_correct, simulator_version_questions(id, position, statement, topic_id, topics(name))",
+    )
+    .eq("attempt_id", attemptId);
+
+  if (answerError) {
+    throw new Error(answerError.message);
+  }
+
+  const parsedAnswers = ((answerRows ?? []) as RawAttemptAnswerDetailRow[]).filter(
+    (row) =>
+      typeof row.simulator_version_question_id === "string" &&
+      (row.selected_option_id === null || typeof row.selected_option_id === "string") &&
+      (row.is_correct === null || typeof row.is_correct === "boolean"),
+  );
+
+  const questionIds = parsedAnswers
+    .map((row) => row.simulator_version_question_id)
+    .filter((id, index, self) => self.indexOf(id) === index);
+  const selectedOptionIds = parsedAnswers
+    .map((row) => row.selected_option_id)
+    .filter((id): id is string => typeof id === "string")
+    .filter((id, index, self) => self.indexOf(id) === index);
+
+  const selectedTextByOptionId = new Map<string, string>();
+  if (selectedOptionIds.length > 0) {
+    const { data: selectedOptionRows, error: selectedOptionError } = await supabase
+      .from("simulator_version_question_options")
+      .select("id, text")
+      .in("id", selectedOptionIds);
+    if (selectedOptionError) {
+      throw new Error(selectedOptionError.message);
+    }
+    for (const row of selectedOptionRows ?? []) {
+      if (typeof row.id === "string" && typeof row.text === "string") {
+        selectedTextByOptionId.set(row.id, row.text);
+      }
+    }
+  }
+
+  const correctTextByQuestionId = new Map<string, string>();
+  if (questionIds.length > 0) {
+    const { data: correctOptionRows, error: correctOptionError } = await supabase
+      .from("simulator_version_question_options")
+      .select("simulator_version_question_id, text")
+      .in("simulator_version_question_id", questionIds)
+      .eq("is_correct", true);
+    if (correctOptionError) {
+      throw new Error(correctOptionError.message);
+    }
+    for (const row of correctOptionRows ?? []) {
+      if (
+        typeof row.simulator_version_question_id === "string" &&
+        typeof row.text === "string" &&
+        !correctTextByQuestionId.has(row.simulator_version_question_id)
+      ) {
+        correctTextByQuestionId.set(row.simulator_version_question_id, row.text);
+      }
+    }
+  }
+
+  return parsedAnswers
+    .map((row) => {
+      const question = row.simulator_version_questions;
+      if (
+        !question ||
+        typeof question.position !== "number" ||
+        typeof question.statement !== "string" ||
+        typeof question.topic_id !== "string"
+      ) {
+        return null;
+      }
+
+      const selectedOptionText =
+        typeof row.selected_option_id === "string"
+          ? selectedTextByOptionId.get(row.selected_option_id) ?? null
+          : null;
+
+      return {
+        simulatorVersionQuestionId: row.simulator_version_question_id,
+        position: question.position,
+        topicName: extractTopicName(question.topics, question.topic_id),
+        statement: question.statement,
+        selectedOptionText,
+        correctOptionText:
+          correctTextByQuestionId.get(row.simulator_version_question_id) ?? null,
+        isCorrect: row.is_correct === true,
+      } satisfies FinishAttemptQuestionResult;
+    })
+    .filter((row): row is FinishAttemptQuestionResult => !!row)
+    .sort((a, b) => a.position - b.position);
+}
+
 async function expireAttemptIfActive(
   supabase: DbClient,
   attemptId: string,
@@ -921,12 +1036,15 @@ export async function finishAttemptForStudent(input: {
     );
   }
 
+  const questionResults = await loadAttemptQuestionResults(supabase, input.attemptId);
+
   return {
     attemptId: finishedAttempt.attemptId,
     status: "finished",
     scoreTotal: finishedAttempt.scoreTotal,
     questionsTotal: finishedAttempt.questionsTotal ?? attemptRow.questions_total,
     topicScores: finishedAttempt.topicScores,
+    questionResults,
   };
 }
 

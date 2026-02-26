@@ -1,8 +1,11 @@
 "use client";
 
 import type { StudentVisibleSimulator } from "@/lib/domain/contracts";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Lock } from "lucide-react";
 import { useState } from "react";
 
 interface StudentSimulatorCatalogProps {
@@ -25,7 +28,9 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-export function StudentSimulatorCatalog({ simulators }: StudentSimulatorCatalogProps) {
+export function StudentSimulatorCatalog({
+  simulators,
+}: StudentSimulatorCatalogProps) {
   const [accessCodes, setAccessCodes] = useState<Record<string, string>>({});
   const [busySimulatorId, setBusySimulatorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -46,54 +51,81 @@ export function StudentSimulatorCatalog({ simulators }: StudentSimulatorCatalogP
 
       window.location.href = `/protected/student/attempts/${payload.attemptId}/exam`;
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo iniciar el intento.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo iniciar el intento.",
+      );
       setBusySimulatorId(null);
     }
   }
 
   return (
-    <div className="space-y-3">
-      {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
-      {simulators.map((simulator) => {
-        const busy = busySimulatorId === simulator.id;
-        return (
-          <div key={simulator.id} className="rounded-lg border p-3">
-            <h2 className="font-semibold">{simulator.title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {simulator.description ?? "Sin descripcion"}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Duracion: {simulator.durationMinutes} min | Intentos: {simulator.maxAttempts} |
-              Codigo de acceso: {simulator.hasAccessCode ? "Requerido" : "No requerido"}
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {simulator.hasAccessCode ? (
-                <Input
-                  placeholder="Codigo de acceso"
-                  value={accessCodes[simulator.id] ?? ""}
-                  onChange={(event) =>
-                    setAccessCodes((prev) => ({
-                      ...prev,
-                      [simulator.id]: event.target.value,
-                    }))
-                  }
-                  className="w-full max-w-xs"
-                  disabled={busy}
-                />
-              ) : null}
-              <Button type="button" disabled={busy} onClick={() => handleStart(simulator.id)}>
-                {busy ? "Iniciando..." : "Iniciar / Reanudar"}
-              </Button>
-            </div>
-          </div>
-        );
-      })}
+    <div className="space-y-4">
+      {errorMessage ? (
+        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+      {simulators.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {simulators.map((simulator) => {
+            const busy = busySimulatorId === simulator.id;
+            return (
+              <Card key={simulator.id} className="h-full">
+                <CardHeader className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">
+                      Duracion: {simulator.durationMinutes} min
+                    </Badge>
+                    <Badge variant="outline">
+                      Intentos: {simulator.maxAttempts}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-xl">{simulator.title}</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {simulator.description ?? "Sin descripcion"}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {simulator.hasAccessCode ? (
+                    <div className="space-y-2 rounded-md border bg-muted/50 p-3">
+                      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <Lock size={14} />
+                        Codigo de acceso requerido
+                      </p>
+                      <Input
+                        placeholder="Ingresa tu codigo"
+                        value={accessCodes[simulator.id] ?? ""}
+                        onChange={(event) =>
+                          setAccessCodes((prev) => ({
+                            ...prev,
+                            [simulator.id]: event.target.value,
+                          }))
+                        }
+                        disabled={busy}
+                      />
+                    </div>
+                  ) : null}
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={busy}
+                    onClick={() => handleStart(simulator.id)}
+                  >
+                    {busy ? "Iniciando..." : "Iniciar simulador"}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : null}
       {simulators.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay simuladores disponibles.</p>
+        <p className="text-sm text-muted-foreground">
+          No hay simuladores disponibles.
+        </p>
       ) : null}
     </div>
   );
 }
-
-

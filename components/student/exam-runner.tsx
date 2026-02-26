@@ -1,6 +1,9 @@
 "use client";
 
-import type { StudentExamStateResponse } from "@/lib/domain/contracts";
+import type {
+  FinishAttemptQuestionResult,
+  StudentExamStateResponse,
+} from "@/lib/domain/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +65,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
       correctCount: number;
       totalCount: number;
     }>;
+    questionResults: FinishAttemptQuestionResult[];
   } | null>(null);
 
   useEffect(() => {
@@ -139,6 +143,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
           correctCount: number;
           totalCount: number;
         }>;
+        questionResults: FinishAttemptQuestionResult[];
       }>(
         await fetch(`/api/student/attempts/${initialState.attemptId}/finish`, {
           method: "POST",
@@ -194,6 +199,41 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                 {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Revision pregunta por pregunta</p>
+            <div className="space-y-2">
+              {finishResult.questionResults.map((item) => (
+                <div
+                  key={item.simulatorVersionQuestionId}
+                  className="rounded-md border p-3"
+                >
+                  <p className="text-xs text-muted-foreground">
+                    Pregunta {item.position} | Tema: {item.topicName}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">{item.statement}</p>
+                  <p className="mt-2 text-sm">
+                    Tu respuesta:{" "}
+                    <span className="font-medium">
+                      {item.selectedOptionText ?? "Sin responder"}
+                    </span>
+                  </p>
+                  <p className="text-sm">
+                    Correcta:{" "}
+                    <span className="font-medium">
+                      {item.correctOptionText ?? "No disponible"}
+                    </span>
+                  </p>
+                  <p
+                    className={`text-sm font-medium ${
+                      item.isCorrect ? "text-green-600" : "text-red-500"
+                    }`}
+                  >
+                    {item.isCorrect ? "Correcta" : "Incorrecta"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
           <Button
             type="button"

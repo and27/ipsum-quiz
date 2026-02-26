@@ -64,7 +64,10 @@ async function getVisibleSimulatorAccessInfo(simulatorId: string): Promise<{
   }
 
   if (!data || typeof data.id !== "string") {
-    throw new StudentAccessError("simulator_not_found", "Simulator was not found.");
+    throw new StudentAccessError(
+      "simulator_not_found",
+      "No se encontro el simulador.",
+    );
   }
 
   return {
@@ -139,7 +142,7 @@ export async function verifySimulatorAccessCodeForStudent(input: {
   if (failedAttempts >= ACCESS_CODE_RATE_LIMIT_MAX_FAILURES) {
     throw new StudentAccessError(
       "access_code_rate_limited",
-      "Too many invalid access code attempts. Try again in a few minutes.",
+      "Demasiados intentos de codigo invalido. Intenta nuevamente en unos minutos.",
       ACCESS_CODE_RATE_LIMIT_WINDOW_MINUTES * 60,
     );
   }
@@ -148,7 +151,7 @@ export async function verifySimulatorAccessCodeForStudent(input: {
   if (!accessCode) {
     throw new StudentAccessError(
       "access_code_required",
-      "Access code is required for this simulator.",
+      "El codigo de acceso es obligatorio para este simulador.",
     );
   }
 
@@ -165,12 +168,14 @@ export async function verifySimulatorAccessCodeForStudent(input: {
     if (nextFailures >= ACCESS_CODE_RATE_LIMIT_MAX_FAILURES) {
       throw new StudentAccessError(
         "access_code_rate_limited",
-        "Too many invalid access code attempts. Try again in a few minutes.",
+        "Demasiados intentos de codigo invalido. Intenta nuevamente en unos minutos.",
         ACCESS_CODE_RATE_LIMIT_WINDOW_MINUTES * 60,
       );
     }
 
-    throw new StudentAccessError("invalid_access_code", "Invalid access code.");
+    throw new StudentAccessError(
+      "invalid_access_code",
+      "El codigo de acceso es invalido.",
+    );
   }
 }
-
