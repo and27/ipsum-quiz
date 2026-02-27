@@ -46,6 +46,30 @@ interface QuestionListResult {
   totalPages: number;
 }
 
+async function listConsumedSourceQuestionIds(questionIds: string[]): Promise<Set<string>> {
+  if (questionIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("simulator_version_questions")
+    .select("source_question_id")
+    .in("source_question_id", questionIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const consumedIds = new Set<string>();
+  for (const row of data ?? []) {
+    if (typeof row.source_question_id === "string" && row.source_question_id.length > 0) {
+      consumedIds.add(row.source_question_id);
+    }
+  }
+  return consumedIds;
+}
+
 interface QuestionCreateInput {
   topicId: string;
   statement: string;
@@ -315,6 +339,17 @@ export async function createQuestion(input: QuestionCreateInput): Promise<Questi
   }
 
   return mapQuestion(data as RawQuestionRow, defaultQuestionOptionStats());
+}
+
+export async function listUnassignedQuestionsForBuilder(limit = 200): Promise<Question[]> {
+  const list = await listQuestions({
+    page: 1,
+    pageSize: Math.max(1, Math.min(500, Math.trunc(limit))),
+    includeInactive: false,
+  });
+
+  const consumedIds = await listConsumedSourceQuestionIds(list.items.map((question) => question.id));
+  return list.items.filter((question) => !consumedIds.has(question.id));
 }
 
 export async function updateQuestion(

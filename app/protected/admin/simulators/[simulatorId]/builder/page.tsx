@@ -1,6 +1,6 @@
 import { SimulatorVersionBuilderManager } from "@/components/admin/simulator-version-builder-manager";
 import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
-import { listQuestions } from "@/lib/usecases/questions";
+import { listUnassignedQuestionsForBuilder } from "@/lib/usecases/questions";
 import { getSimulatorBuilderState, SimulatorBuilderError } from "@/lib/usecases/simulators";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -34,11 +34,7 @@ async function AdminSimulatorBuilderContent({
     throw error;
   }
 
-  const questions = await listQuestions({
-    page: 1,
-    pageSize: 200,
-    includeInactive: false,
-  });
+  const questions = await listUnassignedQuestionsForBuilder(200);
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -50,7 +46,7 @@ async function AdminSimulatorBuilderContent({
       <SimulatorVersionBuilderManager
         simulatorId={simulatorId}
         initialState={builderState}
-        availableQuestions={questions.items}
+        availableQuestions={questions}
       />
     </div>
   );

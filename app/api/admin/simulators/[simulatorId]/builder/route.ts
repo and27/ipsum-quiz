@@ -130,6 +130,9 @@ export async function POST(
           { status: 409 },
         );
       }
+      if (error.code === "question_already_consumed") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

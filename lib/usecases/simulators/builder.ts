@@ -15,6 +15,7 @@ export type SimulatorBuilderErrorCode =
   | "draft_already_exists"
   | "version_locked"
   | "question_not_found"
+  | "question_already_consumed"
   | "question_not_eligible"
   | "invalid_position"
   | "not_found"
@@ -470,6 +471,24 @@ async function assertSourceQuestionEligible(sourceQuestionId: string): Promise<{
     throw new SimulatorBuilderError(
       "question_not_eligible",
       "La pregunta debe tener al menos 2 opciones activas y exactamente 1 opcion correcta activa.",
+    );
+  }
+
+  const { data: consumedRow, error: consumedError } = await supabase
+    .from("simulator_version_questions")
+    .select("id")
+    .eq("source_question_id", sourceQuestionId)
+    .limit(1)
+    .maybeSingle();
+
+  if (consumedError) {
+    throw new Error(consumedError.message);
+  }
+
+  if (consumedRow?.id) {
+    throw new SimulatorBuilderError(
+      "question_already_consumed",
+      "La pregunta ya fue asignada a un simulador y no puede reutilizarse.",
     );
   }
 
