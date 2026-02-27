@@ -352,7 +352,11 @@ export function SimulatorsManager({
         ...prev,
         [updatedSimulator.id]: updatedSimulator.campus,
       }));
-      setSuccessMessage("Simulador actualizado.");
+      if (typeof payload.isActive === "boolean") {
+        setSuccessMessage(payload.isActive ? "Simulador reactivado." : "Simulador archivado.");
+      } else {
+        setSuccessMessage("Simulador actualizado.");
+      }
       return true;
     } catch (error: unknown) {
       setErrorMessage(
@@ -412,7 +416,7 @@ export function SimulatorsManager({
                   await loadSimulators(1, checked);
                 }}
               />
-              <label htmlFor="simulators-include-inactive">Incluir inactivos</label>
+              <label htmlFor="simulators-include-inactive">Incluir archivados</label>
             </div>
           </div>
         </CardHeader>
@@ -455,7 +459,7 @@ export function SimulatorsManager({
                 <div key={simulator.id} className="space-y-3 rounded-lg border p-3">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={simulator.isActive ? "default" : "secondary"}>
-                      {simulator.isActive ? "Activo" : "Inactivo"}
+                      {simulator.isActive ? "Activo" : "Archivado"}
                     </Badge>
                     <Badge variant="outline">{simulator.status}</Badge>
                     <Badge variant={simulator.hasAccessCode ? "default" : "outline"}>
@@ -635,7 +639,7 @@ export function SimulatorsManager({
                         })
                       }
                     >
-                      {simulator.isActive ? "Desactivar" : "Activar"}
+                      {simulator.isActive ? "Archivar" : "Reactivar"}
                     </Button>
 
                     {simulator.hasAccessCode ? (

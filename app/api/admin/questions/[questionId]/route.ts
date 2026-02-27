@@ -1,6 +1,6 @@
 import type { AdminQuestionUpdateRequest } from "@/lib/domain/contracts";
 import { mapAuthGuardErrorToResponse, requireAdmin } from "@/lib/usecases/auth";
-import { QuestionInputError, updateQuestion } from "@/lib/usecases/questions";
+import { deleteQuestion, QuestionInputError, updateQuestion } from "@/lib/usecases/questions";
 import { NextRequest, NextResponse } from "next/server";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -64,6 +64,43 @@ export async function PATCH(
 
     return NextResponse.json(
       { error: "No se pudo actualizar la pregunta." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ questionId: string }> },
+) {
+  try {
+    await requireAdmin();
+
+    const { questionId } = await context.params;
+    if (!questionId) {
+      return NextResponse.json({ error: "ID de pregunta invalido." }, { status: 400 });
+    }
+
+    await deleteQuestion(questionId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const authResponse = mapAuthGuardErrorToResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
+    if (error instanceof QuestionInputError) {
+      if (error.code === "not_found" || error.code === "topic_not_found") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      if (error.code === "question_in_use") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: "No se pudo eliminar la pregunta." },
       { status: 500 },
     );
   }

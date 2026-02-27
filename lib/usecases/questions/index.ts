@@ -1,5 +1,6 @@
 export {
   createQuestion,
+  deleteQuestion,
   listQuestions,
   listUnassignedQuestionsForBuilder,
   QuestionInputError,

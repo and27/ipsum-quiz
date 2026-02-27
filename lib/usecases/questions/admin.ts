@@ -8,7 +8,8 @@ export type QuestionInputErrorCode =
   | "not_found"
   | "topic_not_found"
   | "no_changes"
-  | "question_not_ready";
+  | "question_not_ready"
+  | "question_in_use";
 
 export class QuestionInputError extends Error {
   readonly code: QuestionInputErrorCode;
@@ -413,4 +414,45 @@ export async function updateQuestion(
 
   const stats = await getQuestionOptionStats(questionId);
   return mapQuestion(data as RawQuestionRow, stats);
+}
+
+export async function deleteQuestion(questionId: string): Promise<void> {
+  if (!questionId) {
+    throw new QuestionInputError("not_found", "Question was not found.");
+  }
+
+  const supabase = await createClient();
+
+  const { data: usageRow, error: usageError } = await supabase
+    .from("simulator_version_questions")
+    .select("id")
+    .eq("source_question_id", questionId)
+    .limit(1)
+    .maybeSingle();
+
+  if (usageError) {
+    throw new Error(usageError.message);
+  }
+
+  if (usageRow?.id) {
+    throw new QuestionInputError(
+      "question_in_use",
+      "No se puede eliminar la pregunta porque ya fue usada en un simulador.",
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("questions")
+    .delete()
+    .eq("id", questionId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new QuestionInputError("not_found", "Question was not found.");
+  }
 }

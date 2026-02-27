@@ -415,13 +415,45 @@ export function QuestionsManager({
         ...prev,
         [updatedQuestion.id]: updatedQuestion.imageUrl ?? "",
       }));
-      setSuccessMessage("Pregunta actualizada.");
+      if (typeof payload.isActive === "boolean") {
+        setSuccessMessage(payload.isActive ? "Pregunta reactivada." : "Pregunta archivada.");
+      } else {
+        setSuccessMessage("Pregunta actualizada.");
+      }
       return true;
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudo actualizar la pregunta.",
       );
       return false;
+    } finally {
+      setRowBusy((prev) => ({ ...prev, [question.id]: false }));
+    }
+  }
+
+  async function handleDeleteQuestion(question: Question): Promise<void> {
+    const confirmed = window.confirm(
+      "Esta accion eliminara la pregunta de forma permanente. ¿Deseas continuar?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setRowBusy((prev) => ({ ...prev, [question.id]: true }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/questions/${question.id}`, {
+        method: "DELETE",
+      });
+      await parseApiResponse<{ ok: true }>(response);
+      setSuccessMessage("Pregunta eliminada permanentemente.");
+      await loadQuestions(meta.page, includeInactive);
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No se pudo eliminar la pregunta.",
+      );
     } finally {
       setRowBusy((prev) => ({ ...prev, [question.id]: false }));
     }
@@ -528,7 +560,7 @@ export function QuestionsManager({
                   await loadQuestions(1, checked);
                 }}
               />
-              <label htmlFor="questions-include-inactive">Incluir inactivos</label>
+              <label htmlFor="questions-include-inactive">Incluir archivadas</label>
             </div>
           </div>
         </CardHeader>
@@ -562,7 +594,7 @@ export function QuestionsManager({
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Badge variant={question.isActive ? "default" : "secondary"}>
-                        {question.isActive ? "Activa" : "Inactiva"}
+                        {question.isActive ? "Activa" : "Archivada"}
                       </Badge>
                       <Badge variant={question.isBankReady ? "default" : "outline"}>
                         {question.isBankReady ? "Lista para banco" : "No lista para banco"}
@@ -705,12 +737,20 @@ export function QuestionsManager({
                         })
                       }
                     >
-                      {question.isActive ? "Desactivar" : "Activar"}
+                      {question.isActive ? "Archivar" : "Reactivar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={busy || uploadingImage}
+                      onClick={() => handleDeleteQuestion(question)}
+                    >
+                      Eliminar
                     </Button>
                   </div>
                   {!question.isBankReady && !question.isActive ? (
                     <p className="text-xs text-amber-600">
-                      Para activar, esta pregunta necesita al menos 2 opciones activas y exactamente 1 opcion correcta activa.
+                      Para reactivar, esta pregunta necesita al menos 2 opciones activas y exactamente 1 opcion correcta activa.
                     </p>
                   ) : null}
                 </div>
