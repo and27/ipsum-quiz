@@ -117,8 +117,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const shouldActivate =
+      !!payload.options &&
+      payload.options.length >= 2 &&
+      payload.options.filter((option) => option.isCorrect === true).length === 1;
+
     const question = await createQuestion({
       ...payload,
+      isActive: shouldActivate,
       createdBy: session.userId,
     });
 

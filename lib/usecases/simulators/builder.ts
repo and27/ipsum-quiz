@@ -718,6 +718,39 @@ export async function addQuestionToDraftVersion(
   return created;
 }
 
+export async function addQuestionsToDraftVersion(
+  simulatorId: string,
+  sourceQuestionIds: string[],
+  requestedPosition?: number,
+): Promise<SimulatorVersionQuestion[]> {
+  const normalizedIds = sourceQuestionIds
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const uniqueIds = Array.from(new Set(normalizedIds));
+  const insertedItems: SimulatorVersionQuestion[] = [];
+  let nextPosition = requestedPosition;
+
+  for (const sourceQuestionId of uniqueIds) {
+    const inserted = await addQuestionToDraftVersion(
+      simulatorId,
+      sourceQuestionId,
+      nextPosition,
+    );
+    insertedItems.push(inserted);
+
+    if (typeof nextPosition === "number" && Number.isFinite(nextPosition)) {
+      nextPosition = Math.trunc(nextPosition) + 1;
+    }
+  }
+
+  return insertedItems;
+}
+
 export async function reorderDraftVersionQuestion(
   simulatorId: string,
   versionQuestionId: string,

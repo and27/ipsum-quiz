@@ -8,6 +8,7 @@ export {
   verifyAccessCode,
 } from "./admin";
 export {
+  addQuestionsToDraftVersion,
   addQuestionToDraftVersion,
   duplicatePublishedVersionToDraft,
   getSimulatorBuilderState,

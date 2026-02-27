@@ -31,6 +31,15 @@ interface DraftOption {
   isCorrect: boolean;
 }
 
+function createDefaultDraftOptions(): DraftOption[] {
+  return [
+    { id: crypto.randomUUID(), text: "", isCorrect: true },
+    { id: crypto.randomUUID(), text: "", isCorrect: false },
+    { id: crypto.randomUUID(), text: "", isCorrect: false },
+    { id: crypto.randomUUID(), text: "", isCorrect: false },
+  ];
+}
+
 interface QuestionDetailsFormFieldsProps {
   prefix: string;
   topicId: string;
@@ -214,8 +223,7 @@ export function QuestionsManager({
   const [newStatement, setNewStatement] = useState("");
   const [newImageUrl, setNewImageUrl] = useState("");
   const [newOptions, setNewOptions] = useState<DraftOption[]>([
-    { id: crypto.randomUUID(), text: "", isCorrect: true },
-    { id: crypto.randomUUID(), text: "", isCorrect: false },
+    ...createDefaultDraftOptions(),
   ]);
 
   const [editStatements, setEditStatements] = useState<Record<string, string>>(
@@ -300,10 +308,7 @@ export function QuestionsManager({
       await parseApiResponse<AdminQuestionResponse>(response);
       setNewStatement("");
       setNewImageUrl("");
-      setNewOptions([
-        { id: crypto.randomUUID(), text: "", isCorrect: true },
-        { id: crypto.randomUUID(), text: "", isCorrect: false },
-      ]);
+      setNewOptions(createDefaultDraftOptions());
       setIsCreateModalOpen(false);
       setSuccessMessage("Pregunta creada.");
       await loadQuestions(1, includeInactive);

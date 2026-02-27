@@ -50,6 +50,7 @@ interface QuestionCreateInput {
   topicId: string;
   statement: string;
   imageUrl?: string | null;
+  isActive?: boolean;
   createdBy: string;
 }
 
@@ -301,7 +302,7 @@ export async function createQuestion(input: QuestionCreateInput): Promise<Questi
       topic_id: topicId,
       statement,
       image_url: imageUrl,
-      is_active: false,
+      is_active: input.isActive ?? false,
       created_by: input.createdBy,
     })
     .select(
@@ -378,4 +379,3 @@ export async function updateQuestion(
   const stats = await getQuestionOptionStats(questionId);
   return mapQuestion(data as RawQuestionRow, stats);
 }
-

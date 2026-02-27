@@ -72,7 +72,7 @@ export function SimulatorVersionBuilderManager({
   const [editPositions, setEditPositions] = useState<Record<string, string>>(
     () => buildEditPositions(initialState.items),
   );
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [newQuestionPosition, setNewQuestionPosition] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -96,19 +96,38 @@ export function SimulatorVersionBuilderManager({
 
   useEffect(() => {
     if (availableToAdd.length === 0) {
-      if (selectedQuestionId) {
-        setSelectedQuestionId("");
+      if (selectedQuestionIds.length > 0) {
+        setSelectedQuestionIds([]);
       }
       return;
     }
 
-    const stillAvailable = availableToAdd.some(
-      (question) => question.id === selectedQuestionId,
+    setSelectedQuestionIds((previous) =>
+      previous.filter((questionId) =>
+        availableToAdd.some((question) => question.id === questionId),
+      ),
     );
-    if (!stillAvailable) {
-      setSelectedQuestionId(availableToAdd[0].id);
-    }
-  }, [availableToAdd, selectedQuestionId]);
+  }, [availableToAdd, selectedQuestionIds.length]);
+
+  const allSelected =
+    availableToAdd.length > 0 && selectedQuestionIds.length === availableToAdd.length;
+
+  function toggleQuestionSelection(questionId: string) {
+    setSelectedQuestionIds((previous) => {
+      if (previous.includes(questionId)) {
+        return previous.filter((id) => id !== questionId);
+      }
+      return [...previous, questionId];
+    });
+  }
+
+  function selectAllQuestions() {
+    setSelectedQuestionIds(availableToAdd.map((question) => question.id));
+  }
+
+  function clearSelectedQuestions() {
+    setSelectedQuestionIds([]);
+  }
 
   async function loadState() {
     const response = await fetch(`/api/admin/simulators/${simulatorId}/builder`, {
@@ -133,29 +152,29 @@ export function SimulatorVersionBuilderManager({
     setValidationResult(null);
 
     try {
-      if (!selectedQuestionId) {
-        throw new Error("Selecciona una pregunta disponible del banco.");
-      }
-      const isSelectable = availableToAdd.some(
-        (question) => question.id === selectedQuestionId,
-      );
-      if (!isSelectable) {
-        throw new Error(
-          "La pregunta seleccionada ya no esta disponible. Intenta nuevamente.",
-        );
+      if (selectedQuestionIds.length === 0) {
+        throw new Error("Selecciona al menos una pregunta del banco.");
       }
 
       const response = await fetch(`/api/admin/simulators/${simulatorId}/builder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceQuestionId: selectedQuestionId,
+          sourceQuestionIds: selectedQuestionIds,
           position: newQuestionPosition ? Number(newQuestionPosition) : undefined,
         }),
       });
-      await parseApiResponse<{ item: SimulatorVersionQuestion }>(response);
+      const payload = await parseApiResponse<{
+        items?: SimulatorVersionQuestion[];
+        addedCount?: number;
+      }>(response);
       setNewQuestionPosition("");
-      setSuccessMessage("Pregunta agregada a la version borrador.");
+      setSelectedQuestionIds([]);
+      setSuccessMessage(
+        payload.addedCount && payload.addedCount > 1
+          ? `${payload.addedCount} preguntas agregadas a la version borrador.`
+          : "Pregunta agregada a la version borrador.",
+      );
       await loadState();
     } catch (error: unknown) {
       if (
@@ -343,27 +362,57 @@ export function SimulatorVersionBuilderManager({
           ) : null}
           <form onSubmit={handleAddQuestion} className="space-y-3">
             <div className="space-y-1">
-              <label htmlFor="builder-source-question" className="text-sm font-medium">
-                Pregunta del banco
-              </label>
-              <select
-                id="builder-source-question"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
-                value={selectedQuestionId}
-                onChange={(event) => setSelectedQuestionId(event.target.value)}
-                disabled={isAdding || availableToAdd.length === 0 || !isEditable}
-              >
-                {availableToAdd.map((question) => (
-                  <option
-                    key={question.id}
-                    value={question.id}
-                    className="text-black"
-                    style={{ backgroundColor: "#ffffff", color: "#111111" }}
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium">Preguntas del banco</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isAdding || availableToAdd.length === 0 || !isEditable || allSelected}
+                    onClick={selectAllQuestions}
                   >
-                    {question.topicName} - {question.statement}
-                  </option>
+                    Marcar todas
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isAdding || selectedQuestionIds.length === 0 || !isEditable}
+                    onClick={clearSelectedQuestions}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3">
+                {availableToAdd.map((question) => (
+                  <label
+                    key={question.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedQuestionIds.includes(question.id)}
+                      onChange={() => toggleQuestionSelection(question.id)}
+                      disabled={isAdding || !isEditable}
+                    />
+                    <span>
+                      <span className="font-medium">{question.topicName}</span>
+                      {" - "}
+                      {question.statement}
+                    </span>
+                  </label>
                 ))}
-              </select>
+                {availableToAdd.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No hay preguntas disponibles para seleccionar.
+                  </p>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Seleccionadas: {selectedQuestionIds.length}
+              </p>
             </div>
             <div className="space-y-1">
               <label htmlFor="builder-position" className="text-sm font-medium">
@@ -380,9 +429,14 @@ export function SimulatorVersionBuilderManager({
             </div>
             <Button
               type="submit"
-              disabled={isAdding || availableToAdd.length === 0 || !isEditable}
+              disabled={
+                isAdding ||
+                availableToAdd.length === 0 ||
+                selectedQuestionIds.length === 0 ||
+                !isEditable
+              }
             >
-              {isAdding ? "Agregando..." : "Agregar pregunta"}
+              {isAdding ? "Agregando..." : "Agregar seleccionadas"}
             </Button>
           </form>
           {availableToAdd.length === 0 ? (

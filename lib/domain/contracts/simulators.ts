@@ -53,6 +53,7 @@ export interface AdminSimulatorBuilderStateResponse {
 
 export interface AdminSimulatorBuilderAddQuestionRequest {
   sourceQuestionId: string;
+  sourceQuestionIds?: string[];
   position?: number;
 }
 

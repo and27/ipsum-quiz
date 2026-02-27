@@ -4,6 +4,7 @@ import type {
 } from "@/lib/domain/contracts";
 import { mapAuthGuardErrorToResponse, requireAdmin } from "@/lib/usecases/auth";
 import {
+  addQuestionsToDraftVersion,
   addQuestionToDraftVersion,
   getSimulatorBuilderState,
   SimulatorBuilderError,
@@ -12,6 +13,17 @@ import { NextRequest, NextResponse } from "next/server";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function parseSourceQuestionIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 export async function GET(
@@ -63,22 +75,42 @@ export async function POST(
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
-    if (!isObject(body) || typeof body.sourceQuestionId !== "string") {
+    if (!isObject(body)) {
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
+    }
+
+    const sourceQuestionIds = parseSourceQuestionIds(body.sourceQuestionIds);
+    const sourceQuestionId =
+      typeof body.sourceQuestionId === "string" ? body.sourceQuestionId : "";
+
+    if (!sourceQuestionId && sourceQuestionIds.length === 0) {
       return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
     }
 
     const payload: AdminSimulatorBuilderAddQuestionRequest = {
-      sourceQuestionId: body.sourceQuestionId,
+      sourceQuestionId,
+      sourceQuestionIds: sourceQuestionIds.length > 0 ? sourceQuestionIds : undefined,
       position: typeof body.position === "number" ? body.position : undefined,
     };
     payloadForLog = payload;
 
-    const item = await addQuestionToDraftVersion(
-      simulatorId,
-      payload.sourceQuestionId,
-      payload.position,
-    );
-    return NextResponse.json({ item }, { status: 201 });
+    if (sourceQuestionIds.length > 0) {
+      const items = await addQuestionsToDraftVersion(
+        simulatorId,
+        sourceQuestionIds,
+        payload.position,
+      );
+      return NextResponse.json(
+        {
+          items,
+          addedCount: items.length,
+        },
+        { status: 201 },
+      );
+    }
+
+    const item = await addQuestionToDraftVersion(simulatorId, sourceQuestionId, payload.position);
+    return NextResponse.json({ item, items: [item], addedCount: 1 }, { status: 201 });
   } catch (error) {
     const authResponse = mapAuthGuardErrorToResponse(error);
     if (authResponse) {
