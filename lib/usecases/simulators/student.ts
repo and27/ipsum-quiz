@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 interface RawSimulatorRow {
   id: string;
   title: string;
+  campus?: string;
   description: string | null;
   access_code_hash: string | null;
   max_attempts: number;
@@ -41,6 +42,10 @@ function parsePageSize(value?: number): number {
   return Math.max(1, Math.min(100, Math.trunc(value)));
 }
 
+function parseCampus(value: unknown): "canar" | "azogues" {
+  return value === "azogues" ? "azogues" : "canar";
+}
+
 function parseSimulatorRow(row: RawSimulatorRow): StudentVisibleSimulator | null {
   if (
     typeof row.id !== "string" ||
@@ -63,6 +68,7 @@ function parseSimulatorRow(row: RawSimulatorRow): StudentVisibleSimulator | null
   return {
     id: row.id,
     title: row.title,
+    campus: parseCampus(row.campus),
     description: row.description,
     maxAttempts: row.max_attempts,
     durationMinutes: row.duration_minutes,
@@ -79,16 +85,22 @@ export async function listVisibleSimulatorsForStudent(
   const to = from + pageSize - 1;
 
   const supabase = await createClient();
-  const { data, error, count } = await supabase
+  let dbQuery = supabase
     .from("simulators")
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
       { count: "exact" },
     )
     .eq("status", "published")
     .eq("is_active", true)
     .order("updated_at", { ascending: false })
     .range(from, to);
+
+  if (query.campus === "canar" || query.campus === "azogues") {
+    dbQuery = dbQuery.eq("campus", query.campus);
+  }
+
+  const { data, error, count } = await dbQuery;
 
   if (error) {
     throw new Error(error.message);

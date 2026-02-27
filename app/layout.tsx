@@ -9,8 +9,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Ipsum Quiz",
-  description: "Plataforma de simuladores Ipsum Quiz",
+  title: "Ipsum Solutio Simulador",
+  description: "Plataforma de simuladores Ipsum Solutio",
 };
 
 const geistSans = Geist({

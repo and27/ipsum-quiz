@@ -1,5 +1,6 @@
 import type { PaginatedResult } from "@/lib/domain/common";
 import type {
+  SimulatorCampus,
   Simulator,
   SimulatorPublishValidation,
   SimulatorStatus,
@@ -17,6 +18,7 @@ export type AdminSimulatorsListResponse = PaginatedResult<Simulator>;
 
 export interface AdminSimulatorCreateRequest {
   title: string;
+  campus?: SimulatorCampus;
   description?: string | null;
   maxAttempts?: number;
   durationMinutes: number;
@@ -26,6 +28,7 @@ export interface AdminSimulatorCreateRequest {
 
 export interface AdminSimulatorUpdateRequest {
   title?: string;
+  campus?: SimulatorCampus;
   description?: string | null;
   maxAttempts?: number;
   durationMinutes?: number;

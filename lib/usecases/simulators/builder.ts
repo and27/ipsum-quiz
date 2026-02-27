@@ -34,6 +34,7 @@ export class SimulatorBuilderError extends Error {
 interface RawSimulatorRow {
   id: string;
   title: string;
+  campus?: string;
   description: string | null;
   access_code_hash: string | null;
   max_attempts: number;
@@ -99,6 +100,7 @@ function parseSimulatorRow(row: unknown): Simulator | null {
   return {
     id: row.id,
     title: row.title,
+    campus: row.campus === "azogues" ? "azogues" : "canar",
     description: row.description,
     maxAttempts: row.max_attempts,
     durationMinutes: row.duration_minutes,
@@ -196,7 +198,7 @@ async function getSimulatorById(simulatorId: string): Promise<Simulator> {
   const { data, error } = await supabase
     .from("simulators")
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .eq("id", simulatorId)
     .maybeSingle();
@@ -943,7 +945,7 @@ export async function publishDraftVersion(simulatorId: string): Promise<{
     })
     .eq("id", simulator.id)
     .select(
-      "id, title, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .single();
   if (updateSimulatorError) {

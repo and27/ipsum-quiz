@@ -7,6 +7,7 @@ import type {
   AdminSimulatorUpdateRequest,
   PaginationMeta,
   Simulator,
+  SimulatorCampus,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { BaseModal } from "@/components/ui/base-modal";
@@ -66,18 +67,26 @@ function buildEditAccessCode(simulators: Simulator[]): Record<string, string> {
   );
 }
 
+function buildEditCampus(simulators: Simulator[]): Record<string, SimulatorCampus> {
+  return Object.fromEntries(
+    simulators.map((simulator) => [simulator.id, simulator.campus]),
+  );
+}
+
 interface SimulatorFormFieldsProps {
   prefix: string;
   title: string;
   description: string;
   durationMinutes: string;
   maxAttempts: string;
+  campus: SimulatorCampus;
   accessCode: string;
   disabled: boolean;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onDurationChange: (value: string) => void;
   onMaxAttemptsChange: (value: string) => void;
+  onCampusChange: (value: SimulatorCampus) => void;
   onAccessCodeChange: (value: string) => void;
 }
 
@@ -87,12 +96,14 @@ function SimulatorFormFields({
   description,
   durationMinutes,
   maxAttempts,
+  campus,
   accessCode,
   disabled,
   onTitleChange,
   onDescriptionChange,
   onDurationChange,
   onMaxAttemptsChange,
+  onCampusChange,
   onAccessCodeChange,
 }: SimulatorFormFieldsProps) {
   return (
@@ -155,6 +166,25 @@ function SimulatorFormFields({
         </div>
       </div>
       <div className="space-y-1">
+        <label htmlFor={`${prefix}-campus`} className="text-sm font-medium">
+          Sede
+        </label>
+        <select
+          id={`${prefix}-campus`}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
+          value={campus}
+          onChange={(event) => onCampusChange(event.target.value as SimulatorCampus)}
+          disabled={disabled}
+        >
+          <option value="canar" style={{ backgroundColor: "#ffffff", color: "#111111" }}>
+            Cañar
+          </option>
+          <option value="azogues" style={{ backgroundColor: "#ffffff", color: "#111111" }}>
+            Azogues
+          </option>
+        </select>
+      </div>
+      <div className="space-y-1">
         <label htmlFor={`${prefix}-access-code`} className="text-sm font-medium">
           Codigo de acceso
         </label>
@@ -188,6 +218,7 @@ export function SimulatorsManager({
   const [newDescription, setNewDescription] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("60");
   const [newMaxAttempts, setNewMaxAttempts] = useState("3");
+  const [newCampus, setNewCampus] = useState<SimulatorCampus>("canar");
   const [newAccessCode, setNewAccessCode] = useState("");
 
   const [editTitle, setEditTitle] = useState<Record<string, string>>(
@@ -204,6 +235,9 @@ export function SimulatorsManager({
   );
   const [editAccessCode, setEditAccessCode] = useState<Record<string, string>>(
     () => buildEditAccessCode(initialSimulators.items),
+  );
+  const [editCampus, setEditCampus] = useState<Record<string, SimulatorCampus>>(
+    () => buildEditCampus(initialSimulators.items),
   );
 
   const totalLabel = useMemo(() => {
@@ -228,6 +262,7 @@ export function SimulatorsManager({
       setEditDuration(buildEditDuration(payload.items));
       setEditMaxAttempts(buildEditMaxAttempts(payload.items));
       setEditAccessCode(buildEditAccessCode(payload.items));
+      setEditCampus(buildEditCampus(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "No se pudieron cargar los simuladores.",
@@ -246,6 +281,7 @@ export function SimulatorsManager({
     try {
       const payload: AdminSimulatorCreateRequest = {
         title: newTitle,
+        campus: newCampus,
         description: newDescription || null,
         durationMinutes: Number(newDurationMinutes),
         maxAttempts: Number(newMaxAttempts),
@@ -262,6 +298,7 @@ export function SimulatorsManager({
       setNewDescription("");
       setNewDurationMinutes("60");
       setNewMaxAttempts("3");
+      setNewCampus("canar");
       setNewAccessCode("");
       setIsCreateModalOpen(false);
       setSuccessMessage("Simulador creado.");
@@ -311,6 +348,10 @@ export function SimulatorsManager({
         ...prev,
         [updatedSimulator.id]: updatedSimulator.accessCode ?? "",
       }));
+      setEditCampus((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: updatedSimulator.campus,
+      }));
       setSuccessMessage("Simulador actualizado.");
       return true;
     } catch (error: unknown) {
@@ -339,12 +380,14 @@ export function SimulatorsManager({
               description={newDescription}
               durationMinutes={newDurationMinutes}
               maxAttempts={newMaxAttempts}
+              campus={newCampus}
               accessCode={newAccessCode}
               disabled={isCreating}
               onTitleChange={setNewTitle}
               onDescriptionChange={setNewDescription}
               onDurationChange={setNewDurationMinutes}
               onMaxAttemptsChange={setNewMaxAttempts}
+              onCampusChange={setNewCampus}
               onAccessCodeChange={setNewAccessCode}
             />
             <Button type="submit" disabled={isCreating}>
@@ -395,12 +438,14 @@ export function SimulatorsManager({
               const maxAttempts =
                 editMaxAttempts[simulator.id] ?? String(simulator.maxAttempts);
               const accessCode = editAccessCode[simulator.id] ?? "";
+              const campus = editCampus[simulator.id] ?? simulator.campus;
               const normalizedAccessCode = accessCode.trim();
               const currentAccessCode = simulator.accessCode ?? "";
               const accessCodeChanged = normalizedAccessCode !== currentAccessCode;
 
               const hasChanges =
                 title.trim() !== simulator.title ||
+                campus !== simulator.campus ||
                 (description || null) !== simulator.description ||
                 Number(durationMinutes) !== simulator.durationMinutes ||
                 Number(maxAttempts) !== simulator.maxAttempts ||
@@ -424,6 +469,14 @@ export function SimulatorsManager({
                         Titulo
                       </p>
                       <p className="font-medium">{simulator.title}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Sede
+                      </p>
+                      <p className="font-medium">
+                        {simulator.campus === "canar" ? "Cañar" : "Azogues"}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -485,6 +538,10 @@ export function SimulatorsManager({
                               ...prev,
                               [simulator.id]: String(simulator.maxAttempts),
                             }));
+                            setEditCampus((prev) => ({
+                              ...prev,
+                              [simulator.id]: simulator.campus,
+                            }));
                             setEditAccessCode((prev) => ({
                               ...prev,
                               [simulator.id]: simulator.accessCode ?? "",
@@ -501,6 +558,7 @@ export function SimulatorsManager({
                           event.preventDefault();
                           const didUpdate = await handleUpdateSimulator(simulator, {
                             title,
+                            campus,
                             description: description || null,
                             durationMinutes: Number(durationMinutes),
                             maxAttempts: Number(maxAttempts),
@@ -522,6 +580,7 @@ export function SimulatorsManager({
                           description={description}
                           durationMinutes={durationMinutes}
                           maxAttempts={maxAttempts}
+                          campus={campus}
                           accessCode={accessCode}
                           disabled={busy}
                           onTitleChange={(value) =>
@@ -538,6 +597,12 @@ export function SimulatorsManager({
                           }
                           onMaxAttemptsChange={(value) =>
                             setEditMaxAttempts((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
+                          }
+                          onCampusChange={(value) =>
+                            setEditCampus((prev) => ({
                               ...prev,
                               [simulator.id]: value,
                             }))

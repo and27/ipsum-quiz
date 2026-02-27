@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     const query: StudentVisibleSimulatorsQuery = {
       page: parseNumber(request.nextUrl.searchParams.get("page")),
       pageSize: parseNumber(request.nextUrl.searchParams.get("pageSize")),
+      campus:
+        request.nextUrl.searchParams.get("campus") === "canar" ||
+        request.nextUrl.searchParams.get("campus") === "azogues"
+          ? (request.nextUrl.searchParams.get("campus") as "canar" | "azogues")
+          : undefined,
     };
 
     const result = await listVisibleSimulatorsForStudent(query);

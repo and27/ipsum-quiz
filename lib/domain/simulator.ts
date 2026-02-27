@@ -3,11 +3,13 @@ import type { ISODateTimeString, UUID } from "./common";
 export type SimulatorStatus = "draft" | "published";
 export type AttemptStatus = "active" | "finished" | "expired";
 export type SimulatorVersionStatus = "draft" | "published" | "archived";
+export type SimulatorCampus = "canar" | "azogues";
 
 export interface Simulator {
   id: UUID;
   title: string;
   description: string | null;
+  campus: SimulatorCampus;
   accessCode?: string | null;
   maxAttempts: number;
   durationMinutes: number;

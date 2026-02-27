@@ -9,6 +9,7 @@ import type { TopicScore } from "@/lib/domain/simulator";
 export interface StudentVisibleSimulator {
   id: UUID;
   title: string;
+  campus: "canar" | "azogues";
   description: string | null;
   durationMinutes: number;
   maxAttempts: number;
@@ -121,6 +122,7 @@ export interface StudentAttemptResultResponse {
 export interface StudentVisibleSimulatorsQuery {
   page?: number;
   pageSize?: number;
+  campus?: "canar" | "azogues";
 }
 
 export type StudentVisibleSimulatorsResponse = PaginatedResult<StudentVisibleSimulator>;

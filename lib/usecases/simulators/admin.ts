@@ -1,5 +1,5 @@
 import type { AdminSimulatorsListQuery } from "@/lib/domain/contracts";
-import type { Simulator, SimulatorStatus } from "@/lib/domain/simulator";
+import type { Simulator, SimulatorCampus, SimulatorStatus } from "@/lib/domain/simulator";
 import { createClient } from "@/lib/supabase/server";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
@@ -34,6 +34,7 @@ export class SimulatorInputError extends Error {
 interface RawSimulatorRow {
   id: string;
   title: string;
+  campus?: string;
   description: string | null;
   access_code_hash: string | null;
   access_code_plaintext?: string | null;
@@ -57,6 +58,7 @@ interface SimulatorListResult {
 
 interface SimulatorCreateInput {
   title: string;
+  campus?: SimulatorCampus;
   description?: string | null;
   maxAttempts?: number;
   durationMinutes: number;
@@ -67,6 +69,7 @@ interface SimulatorCreateInput {
 
 interface SimulatorUpdateInput {
   title?: string;
+  campus?: SimulatorCampus;
   description?: string | null;
   maxAttempts?: number;
   durationMinutes?: number;
@@ -81,6 +84,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseSimulatorStatus(value: unknown): SimulatorStatus | null {
   return value === "draft" || value === "published" ? value : null;
+}
+
+function parseSimulatorCampus(value: unknown): SimulatorCampus {
+  return value === "azogues" ? "azogues" : "canar";
 }
 
 function parseSimulatorRow(row: unknown): Simulator | null {
@@ -113,6 +120,7 @@ function parseSimulatorRow(row: unknown): Simulator | null {
   return {
     id: row.id,
     title: row.title,
+    campus: parseSimulatorCampus(row.campus),
     description: row.description,
     accessCode:
       typeof row.access_code_plaintext === "string" ? row.access_code_plaintext : null,
@@ -164,6 +172,16 @@ function normalizeDescription(value: string | null | undefined): string | null {
   }
 
   return description;
+}
+
+function validateCampus(value: SimulatorCampus | undefined): SimulatorCampus | undefined {
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+  if (value !== "canar" && value !== "azogues") {
+    throw new SimulatorInputError("invalid_status", "Sede invalida.");
+  }
+  return value;
 }
 
 function validateDurationMinutes(value: number): number {
@@ -312,7 +330,7 @@ export async function listSimulators(
   let dbQuery = supabase
     .from("simulators")
     .select(
-      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
       { count: "exact" },
     )
     .order("updated_at", { ascending: false })
@@ -349,6 +367,7 @@ export async function createSimulator(
   input: SimulatorCreateInput,
 ): Promise<Simulator> {
   const title = validateTitle(input.title);
+  const campus = validateCampus(input.campus) ?? "canar";
   const description = normalizeDescription(input.description);
   const durationMinutes = validateDurationMinutes(input.durationMinutes);
   const maxAttempts = validateMaxAttempts(
@@ -358,6 +377,7 @@ export async function createSimulator(
 
   const payload: Record<string, unknown> = {
     title,
+    campus,
     description,
     duration_minutes: durationMinutes,
     max_attempts: maxAttempts,
@@ -376,7 +396,7 @@ export async function createSimulator(
     .from("simulators")
     .insert(payload)
     .select(
-      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .single();
 
@@ -409,6 +429,9 @@ export async function updateSimulator(
 
   if (typeof input.title === "string") {
     payload.title = validateTitle(input.title);
+  }
+  if (typeof input.campus === "string") {
+    payload.campus = validateCampus(input.campus);
   }
   if ("description" in input) {
     payload.description = normalizeDescription(input.description);
@@ -448,7 +471,7 @@ export async function updateSimulator(
     .update(payload)
     .eq("id", simulatorId)
     .select(
-      "id, title, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
+      "id, title, campus, description, access_code_hash, access_code_plaintext, max_attempts, duration_minutes, is_active, status, published_version_id, created_by, created_at, updated_at",
     )
     .maybeSingle();
 

@@ -31,6 +31,9 @@ export async function PATCH(
     if (typeof body.title === "string") {
       payload.title = body.title;
     }
+    if (body.campus === "canar" || body.campus === "azogues") {
+      payload.campus = body.campus;
+    }
     if (typeof body.description === "string" || body.description === null) {
       payload.description = body.description;
     }

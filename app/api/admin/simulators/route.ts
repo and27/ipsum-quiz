@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
 
     const payload: AdminSimulatorCreateRequest = {
       title: typeof body.title === "string" ? body.title : "",
+      campus: body.campus === "canar" || body.campus === "azogues" ? body.campus : undefined,
       description:
         typeof body.description === "string" || body.description === null
           ? body.description
