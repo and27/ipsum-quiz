@@ -17,7 +17,7 @@ async function AdminSimulatorsContent() {
   const simulators = await listSimulators({
     page: 1,
     pageSize: 20,
-    includeInactive: true,
+    includeInactive: false,
   });
 
   return (

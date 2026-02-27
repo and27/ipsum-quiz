@@ -17,7 +17,7 @@ async function AdminQuestionsContent() {
   }
 
   const [questions, topics] = await Promise.all([
-    listQuestions({ page: 1, pageSize: 20, includeInactive: true }),
+    listQuestions({ page: 1, pageSize: 20, includeInactive: false }),
     listTopics({ includeInactive: false }),
   ]);
 

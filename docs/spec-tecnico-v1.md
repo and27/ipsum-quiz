@@ -1,14 +1,16 @@
 # Especificacion Tecnica V1 - Plataforma de Simuladores
 
 ## 1. Objetivo
+
 Definir el diseno tecnico implementable para la V1 de la plataforma de simuladores academicos en este repositorio (Next.js + Supabase), cerrando reglas de negocio, modelo de datos, seguridad, APIs y criterios operativos.
 
 ## 2. Alcance V1 (cerrado)
+
 1. Roles: `admin` y `student`.
 2. Autenticacion: email + password (Supabase Auth).
 3. Simuladores visibles para estudiante: solo `published` y `is_active = true`.
-4. Acceso por codigo de simulador obligatorio cuando exista.
-5. Rate limit para validacion de codigo: 5 intentos fallidos por 5 minutos por `user_id + ip + simulator_id`.
+4. Acceso por código de simulador obligatorio cuando exista.
+5. Rate limit para validacion de código: 5 intentos fallidos por 5 minutos por `user_id + ip + simulator_id`.
 6. Intentos maximos por simulador: configurable por admin, default 3.
 7. Regla de consumo de intentos: intento iniciado = intento consumido.
 8. Unico intento activo por `student + simulator_id`.
@@ -25,6 +27,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 16. Imagenes en Supabase Storage con validacion, compresion y normalizacion.
 
 ## 3. Arquitectura
+
 1. Frontend: Next.js App Router (`app/`) con Server Components y Client Components.
 2. Backend web: Route Handlers + Server Actions en Next.js.
 3. Autenticacion y sesion: `@supabase/ssr` con cookies.
@@ -35,6 +38,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 ## 4. Modelo de datos propuesto
 
 ### 4.1 Tablas de identidad
+
 1. `profiles`
    - `id uuid pk` (fk a `auth.users.id`)
    - `role text check (role in ('admin','student'))`
@@ -42,6 +46,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - `created_at timestamptz default now()`
 
 ### 4.2 Banco de preguntas
+
 1. `topics`
    - `id uuid pk`
    - `name text unique`
@@ -66,6 +71,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - Un indice/constraint para garantizar exactamente 1 opcion correcta por pregunta en estado valido de publicacion (se valida con trigger al publicar).
 
 ### 4.3 Simuladores y versionado
+
 1. `simulators`
    - `id uuid pk`
    - `title text not null`
@@ -105,6 +111,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - `unique(simulator_version_question_id, position)`
 
 ### 4.4 Intentos y respuestas
+
 1. `attempts`
    - `id uuid pk`
    - `simulator_id uuid fk simulators(id)`
@@ -133,7 +140,8 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - `total_count int not null`
    - `unique(attempt_id, topic_id)`
 
-### 4.5 Seguridad de codigo y rate limit
+### 4.5 Seguridad de código y rate limit
+
 1. `access_code_attempts`
    - `id bigserial pk`
    - `simulator_id uuid fk simulators(id)`
@@ -147,12 +155,13 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - Si existen 5 fallidos en ventana de 5 minutos, bloquear validacion temporal.
 
 ## 5. Reglas de negocio
+
 1. Estudiante no puede ver opciones correctas en payloads ni UI.
 2. Solo admin puede crear/editar/publicar simuladores, preguntas y opciones.
 3. Un simulador `published` sin `is_active` no aparece al estudiante.
 4. No se puede iniciar intento si:
    - simulador no publicado o inactivo
-   - codigo invalido
+   - código invalido
    - excede intentos maximos
    - ya existe intento activo de ese simulador
 5. Si `now() >= expires_at` y el intento sigue `active`, se marca `expired` y se calcula resultado.
@@ -169,22 +178,25 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 ## 6. Flujos backend clave
 
 ### 6.1 Iniciar intento
+
 1. Validar rol `student`.
 2. Cargar simulador publicado y activo.
-3. Validar rate limit de codigo.
-4. Validar codigo (comparando hash).
+3. Validar rate limit de código.
+4. Validar código (comparando hash).
 5. Validar intentos consumidos `< max_attempts`.
 6. Validar ausencia de intento activo.
 7. Crear `attempt` en transaccion con `expires_at = now() + duration`.
 8. Seed de `attempt_answers` con una fila por pregunta del snapshot.
 
 ### 6.2 Guardar respuesta
+
 1. Validar intento activo y no expirado.
 2. Validar que opcion pertenece a la pregunta del snapshot.
 3. Upsert de respuesta (1 sola opcion posible por pregunta).
 4. Permitir limpiar respuesta (`selected_option_id = null`).
 
 ### 6.3 Finalizar intento
+
 1. Cerrar intento manual o por expiracion.
 2. Calcular `is_correct` por respuesta.
 3. Calcular `score_total`.
@@ -192,11 +204,13 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 5. Persistir y bloquear futuras modificaciones.
 
 ### 6.4 Reanudar intento
+
 1. Buscar intento `active` por `student + simulator`.
 2. Si no expiro, devolver estado completo para continuar.
 3. Si expiro, ejecutar finalizacion por expiracion y devolver resultado.
 
 ## 7. APIs recomendadas (Route Handlers)
+
 1. `POST /api/student/simulators/{id}/attempts/start`
 2. `GET /api/student/attempts/{attemptId}`
 3. `PATCH /api/student/attempts/{attemptId}/answers`
@@ -211,6 +225,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 12. `GET /api/admin/reports/students?...`
 
 ## 8. Seguridad y RLS
+
 1. `profiles`: usuario solo puede leer su propio perfil; admin puede leer todos.
 2. `questions`, `question_options`, `simulators`, `versions`: escritura solo admin.
 3. Lectura estudiante:
@@ -225,6 +240,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - subida solo admin autenticado
 
 ## 9. Especificacion de imagenes (buenas practicas V1)
+
 1. Formatos de entrada permitidos: `image/jpeg`, `image/png`, `image/webp`.
 2. Tamano maximo de archivo: 8 MB.
 3. Resolucion maxima de entrada: 4000 x 4000 px.
@@ -237,6 +253,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 6. Guardar `width`, `height`, `bytes`, `mime_type` y URL final en metadata.
 
 ## 10. Reportes V1
+
 1. Filtros soportados:
    - `simulator_id`
    - `student_id`
@@ -254,6 +271,7 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
    - puntaje por tema
 
 ## 11. Indices minimos recomendados
+
 1. `attempts(student_id, simulator_id, created_at desc)`
 2. `attempts(simulator_id, status, created_at desc)`
 3. `attempts(status, expires_at)`
@@ -262,7 +280,8 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 6. `access_code_attempts(simulator_id, student_id, ip, created_at desc)`
 
 ## 12. Criterios tecnicos de aceptacion
-1. Ningun estudiante puede iniciar intento fuera de reglas de estado/codigo/intentos.
+
+1. Ningun estudiante puede iniciar intento fuera de reglas de estado/código/intentos.
 2. Nunca hay mas de un intento activo por estudiante y simulador.
 3. Cierre por tiempo funciona incluso con navegador cerrado.
 4. Resultados total y por tema coinciden con snapshot del simulador rendido.
@@ -271,8 +290,8 @@ Definir el diseno tecnico implementable para la V1 de la plataforma de simulador
 7. Carga de imagenes fuera de limites es rechazada con mensaje claro.
 
 ## 13. Fuera de alcance V1
+
 1. Exportacion CSV/PDF.
 2. Estado aprobado/reprobado por umbral.
 3. Banco de preguntas con multimedia avanzada (audio/video).
 4. Modo offline.
-

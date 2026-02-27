@@ -32,7 +32,6 @@ export function LoginForm({
   const searchParams = useSearchParams();
   const signupSuccess = searchParams.get("signup") === "success";
   const resetSuccess = searchParams.get("reset") === "success";
-  const signupEmail = searchParams.get("email") ?? "";
 
   const helperMessage = useMemo(() => {
     if (resetSuccess) {

@@ -209,7 +209,7 @@ export function QuestionsManager({
 }: QuestionsManagerProps) {
   const [questions, setQuestions] = useState<Question[]>(initialQuestions.items);
   const [meta, setMeta] = useState<PaginationMeta>(initialQuestions.meta);
-  const [includeInactive, setIncludeInactive] = useState(true);
+  const [includeInactive, setIncludeInactive] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);

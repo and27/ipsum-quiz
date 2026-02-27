@@ -10,10 +10,20 @@ interface AuthButtonProps {
 
 export async function AuthButton({ session: initialSession }: AuthButtonProps) {
   const session = initialSession ?? (await getCurrentSessionContext());
+  const displayName =
+    session.profile?.fullName?.trim() || session.email || "usuario";
 
   return session.userId ? (
     <div className="flex items-center gap-4">
-      Hola, {session.email ?? "usuario"}!
+      Hola, {displayName}!
+      {session.role !== "admin" ? (
+        <Link
+          href="/protected/student/profile"
+          className="rounded-md border px-4 py-2  text-muted-foreground hover:border-primary/40"
+        >
+          Mi perfil
+        </Link>
+      ) : null}
       <LogoutButton />
     </div>
   ) : (

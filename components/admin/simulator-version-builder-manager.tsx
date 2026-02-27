@@ -74,7 +74,6 @@ export function SimulatorVersionBuilderManager({
     () => buildEditPositions(initialState.items),
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [newQuestionPosition, setNewQuestionPosition] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [isValidating, setIsValidating] = useState(false);
@@ -162,14 +161,12 @@ export function SimulatorVersionBuilderManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceQuestionIds: selectedQuestionIds,
-          position: newQuestionPosition ? Number(newQuestionPosition) : undefined,
         }),
       });
       const payload = await parseApiResponse<{
         items?: SimulatorVersionQuestion[];
         addedCount?: number;
       }>(response);
-      setNewQuestionPosition("");
       setSelectedQuestionIds([]);
       setSuccessMessage(
         payload.addedCount && payload.addedCount > 1
@@ -410,19 +407,6 @@ export function SimulatorVersionBuilderManager({
                 Seleccionadas: {selectedQuestionIds.length}
               </p>
             </div>
-            <div className="space-y-1">
-              <label htmlFor="builder-position" className="text-sm font-medium">
-                Posicion de insercion (opcional)
-              </label>
-              <Input
-                id="builder-position"
-                type="number"
-                min={1}
-                value={newQuestionPosition}
-                onChange={(event) => setNewQuestionPosition(event.target.value)}
-                disabled={isAdding || !isEditable}
-              />
-            </div>
             <Button
               type="submit"
               disabled={
@@ -553,9 +537,21 @@ export function SimulatorVersionBuilderManager({
             </Button>
           </div>
           {!draftVersion ? (
-            <p className="text-xs text-muted-foreground">
-              No existe un borrador en este momento. Duplica la version publicada para crear uno.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                No existe un borrador en este momento. Duplica la version publicada para crear uno.
+              </p>
+              {publishedVersion ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDuplicateVersion}
+                  disabled={isDuplicating}
+                >
+                  {isDuplicating ? "Duplicando..." : "Duplicar version publicada"}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
 
           {validationResult ? (

@@ -142,7 +142,7 @@ export async function verifySimulatorAccessCodeForStudent(input: {
   if (failedAttempts >= ACCESS_CODE_RATE_LIMIT_MAX_FAILURES) {
     throw new StudentAccessError(
       "access_code_rate_limited",
-      "Demasiados intentos de codigo invalido. Intenta nuevamente en unos minutos.",
+      "Demasiados intentos de código invalido. Intenta nuevamente en unos minutos.",
       ACCESS_CODE_RATE_LIMIT_WINDOW_MINUTES * 60,
     );
   }
@@ -151,7 +151,7 @@ export async function verifySimulatorAccessCodeForStudent(input: {
   if (!accessCode) {
     throw new StudentAccessError(
       "access_code_required",
-      "El codigo de acceso es obligatorio para este simulador.",
+      "El código de acceso es obligatorio para este simulador.",
     );
   }
 
@@ -168,14 +168,14 @@ export async function verifySimulatorAccessCodeForStudent(input: {
     if (nextFailures >= ACCESS_CODE_RATE_LIMIT_MAX_FAILURES) {
       throw new StudentAccessError(
         "access_code_rate_limited",
-        "Demasiados intentos de codigo invalido. Intenta nuevamente en unos minutos.",
+        "Demasiados intentos de código invalido. Intenta nuevamente en unos minutos.",
         ACCESS_CODE_RATE_LIMIT_WINDOW_MINUTES * 60,
       );
     }
 
     throw new StudentAccessError(
       "invalid_access_code",
-      "El codigo de acceso es invalido.",
+      "El código de acceso es invalido.",
     );
   }
 }

@@ -40,7 +40,9 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
 }
 
 function buildEditTitle(simulators: Simulator[]): Record<string, string> {
-  return Object.fromEntries(simulators.map((simulator) => [simulator.id, simulator.title]));
+  return Object.fromEntries(
+    simulators.map((simulator) => [simulator.id, simulator.title]),
+  );
 }
 
 function buildEditDescription(simulators: Simulator[]): Record<string, string> {
@@ -51,13 +53,19 @@ function buildEditDescription(simulators: Simulator[]): Record<string, string> {
 
 function buildEditDuration(simulators: Simulator[]): Record<string, string> {
   return Object.fromEntries(
-    simulators.map((simulator) => [simulator.id, String(simulator.durationMinutes)]),
+    simulators.map((simulator) => [
+      simulator.id,
+      String(simulator.durationMinutes),
+    ]),
   );
 }
 
 function buildEditMaxAttempts(simulators: Simulator[]): Record<string, string> {
   return Object.fromEntries(
-    simulators.map((simulator) => [simulator.id, String(simulator.maxAttempts)]),
+    simulators.map((simulator) => [
+      simulator.id,
+      String(simulator.maxAttempts),
+    ]),
   );
 }
 
@@ -67,7 +75,9 @@ function buildEditAccessCode(simulators: Simulator[]): Record<string, string> {
   );
 }
 
-function buildEditCampus(simulators: Simulator[]): Record<string, SimulatorCampus> {
+function buildEditCampus(
+  simulators: Simulator[],
+): Record<string, SimulatorCampus> {
   return Object.fromEntries(
     simulators.map((simulator) => [simulator.id, simulator.campus]),
   );
@@ -121,7 +131,10 @@ function SimulatorFormFields({
         />
       </div>
       <div className="space-y-1">
-        <label htmlFor={`${prefix}-description`} className="text-sm font-medium">
+        <label
+          htmlFor={`${prefix}-description`}
+          className="text-sm font-medium"
+        >
           Descripcion
         </label>
         <textarea
@@ -150,7 +163,10 @@ function SimulatorFormFields({
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor={`${prefix}-max-attempts`} className="text-sm font-medium">
+          <label
+            htmlFor={`${prefix}-max-attempts`}
+            className="text-sm font-medium"
+          >
             Intentos maximos
           </label>
           <Input
@@ -173,19 +189,30 @@ function SimulatorFormFields({
           id={`${prefix}-campus`}
           className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground"
           value={campus}
-          onChange={(event) => onCampusChange(event.target.value as SimulatorCampus)}
+          onChange={(event) =>
+            onCampusChange(event.target.value as SimulatorCampus)
+          }
           disabled={disabled}
         >
-          <option value="canar" style={{ backgroundColor: "#ffffff", color: "#111111" }}>
+          <option
+            value="canar"
+            style={{ backgroundColor: "#ffffff", color: "#111111" }}
+          >
             Cañar
           </option>
-          <option value="azogues" style={{ backgroundColor: "#ffffff", color: "#111111" }}>
+          <option
+            value="azogues"
+            style={{ backgroundColor: "#ffffff", color: "#111111" }}
+          >
             Azogues
           </option>
         </select>
       </div>
       <div className="space-y-1">
-        <label htmlFor={`${prefix}-access-code`} className="text-sm font-medium">
+        <label
+          htmlFor={`${prefix}-access-code`}
+          className="text-sm font-medium"
+        >
           Codigo de acceso
         </label>
         <Input
@@ -203,11 +230,15 @@ function SimulatorFormFields({
 export function SimulatorsManager({
   initialSimulators,
 }: SimulatorsManagerProps) {
-  const [simulators, setSimulators] = useState<Simulator[]>(initialSimulators.items);
+  const [simulators, setSimulators] = useState<Simulator[]>(
+    initialSimulators.items,
+  );
   const [meta, setMeta] = useState<PaginationMeta>(initialSimulators.meta);
-  const [includeInactive, setIncludeInactive] = useState(true);
+  const [includeInactive, setIncludeInactive] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingSimulatorId, setEditingSimulatorId] = useState<string | null>(null);
+  const [editingSimulatorId, setEditingSimulatorId] = useState<string | null>(
+    null,
+  );
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -221,18 +252,18 @@ export function SimulatorsManager({
   const [newCampus, setNewCampus] = useState<SimulatorCampus>("canar");
   const [newAccessCode, setNewAccessCode] = useState("");
 
-  const [editTitle, setEditTitle] = useState<Record<string, string>>(
-    () => buildEditTitle(initialSimulators.items),
+  const [editTitle, setEditTitle] = useState<Record<string, string>>(() =>
+    buildEditTitle(initialSimulators.items),
   );
-  const [editDescription, setEditDescription] = useState<Record<string, string>>(
-    () => buildEditDescription(initialSimulators.items),
+  const [editDescription, setEditDescription] = useState<
+    Record<string, string>
+  >(() => buildEditDescription(initialSimulators.items));
+  const [editDuration, setEditDuration] = useState<Record<string, string>>(() =>
+    buildEditDuration(initialSimulators.items),
   );
-  const [editDuration, setEditDuration] = useState<Record<string, string>>(
-    () => buildEditDuration(initialSimulators.items),
-  );
-  const [editMaxAttempts, setEditMaxAttempts] = useState<Record<string, string>>(
-    () => buildEditMaxAttempts(initialSimulators.items),
-  );
+  const [editMaxAttempts, setEditMaxAttempts] = useState<
+    Record<string, string>
+  >(() => buildEditMaxAttempts(initialSimulators.items));
   const [editAccessCode, setEditAccessCode] = useState<Record<string, string>>(
     () => buildEditAccessCode(initialSimulators.items),
   );
@@ -245,7 +276,10 @@ export function SimulatorsManager({
     return `Mostrando ${simulators.length} de ${meta.total} simuladores (${active} activos en la pagina)`;
   }, [simulators, meta.total]);
 
-  async function loadSimulators(nextPage = meta.page, nextIncludeInactive = includeInactive) {
+  async function loadSimulators(
+    nextPage = meta.page,
+    nextIncludeInactive = includeInactive,
+  ) {
     setIsLoadingList(true);
     setErrorMessage(null);
 
@@ -254,7 +288,8 @@ export function SimulatorsManager({
         `/api/admin/simulators?page=${nextPage}&pageSize=${meta.pageSize}&includeInactive=${nextIncludeInactive}`,
         { method: "GET", cache: "no-store" },
       );
-      const payload = await parseApiResponse<AdminSimulatorsListResponse>(response);
+      const payload =
+        await parseApiResponse<AdminSimulatorsListResponse>(response);
       setSimulators(payload.items);
       setMeta(payload.meta);
       setEditTitle(buildEditTitle(payload.items));
@@ -265,14 +300,18 @@ export function SimulatorsManager({
       setEditCampus(buildEditCampus(payload.items));
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudieron cargar los simuladores.",
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los simuladores.",
       );
     } finally {
       setIsLoadingList(false);
     }
   }
 
-  async function handleCreateSimulator(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateSimulator(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     setIsCreating(true);
     setErrorMessage(null);
@@ -305,7 +344,9 @@ export function SimulatorsManager({
       await loadSimulators(1, includeInactive);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo crear el simulador.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el simulador.",
       );
     } finally {
       setIsCreating(false);
@@ -329,9 +370,14 @@ export function SimulatorsManager({
       const parsed = await parseApiResponse<AdminSimulatorResponse>(response);
       const updatedSimulator = parsed.simulator;
       setSimulators((prev) =>
-        prev.map((item) => (item.id === updatedSimulator.id ? updatedSimulator : item)),
+        prev.map((item) =>
+          item.id === updatedSimulator.id ? updatedSimulator : item,
+        ),
       );
-      setEditTitle((prev) => ({ ...prev, [updatedSimulator.id]: updatedSimulator.title }));
+      setEditTitle((prev) => ({
+        ...prev,
+        [updatedSimulator.id]: updatedSimulator.title,
+      }));
       setEditDescription((prev) => ({
         ...prev,
         [updatedSimulator.id]: updatedSimulator.description ?? "",
@@ -353,14 +399,18 @@ export function SimulatorsManager({
         [updatedSimulator.id]: updatedSimulator.campus,
       }));
       if (typeof payload.isActive === "boolean") {
-        setSuccessMessage(payload.isActive ? "Simulador reactivado." : "Simulador archivado.");
+        setSuccessMessage(
+          payload.isActive ? "Simulador reactivado." : "Simulador archivado.",
+        );
       } else {
         setSuccessMessage("Simulador actualizado.");
       }
       return true;
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo actualizar el simulador.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el simulador.",
       );
       return false;
     } finally {
@@ -416,27 +466,34 @@ export function SimulatorsManager({
                   await loadSimulators(1, checked);
                 }}
               />
-              <label htmlFor="simulators-include-inactive">Incluir archivados</label>
+              <label htmlFor="simulators-include-inactive">
+                Incluir archivados
+              </label>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground">{totalLabel}</div>
 
-          {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className="text-sm text-red-500">{errorMessage}</p>
+          ) : null}
           {successMessage ? (
             <p className="text-sm text-green-600">{successMessage}</p>
           ) : null}
 
           {isLoadingList ? (
-            <p className="text-sm text-muted-foreground">Cargando simuladores...</p>
+            <p className="text-sm text-muted-foreground">
+              Cargando simuladores...
+            </p>
           ) : null}
 
           <div className="space-y-4">
             {simulators.map((simulator) => {
               const busy = !!rowBusy[simulator.id];
               const title = editTitle[simulator.id] ?? simulator.title;
-              const description = editDescription[simulator.id] ?? simulator.description ?? "";
+              const description =
+                editDescription[simulator.id] ?? simulator.description ?? "";
               const durationMinutes =
                 editDuration[simulator.id] ?? String(simulator.durationMinutes);
               const maxAttempts =
@@ -445,7 +502,8 @@ export function SimulatorsManager({
               const campus = editCampus[simulator.id] ?? simulator.campus;
               const normalizedAccessCode = accessCode.trim();
               const currentAccessCode = simulator.accessCode ?? "";
-              const accessCodeChanged = normalizedAccessCode !== currentAccessCode;
+              const accessCodeChanged =
+                normalizedAccessCode !== currentAccessCode;
 
               const hasChanges =
                 title.trim() !== simulator.title ||
@@ -456,14 +514,23 @@ export function SimulatorsManager({
                 accessCodeChanged;
 
               return (
-                <div key={simulator.id} className="space-y-3 rounded-lg border p-3">
+                <div
+                  key={simulator.id}
+                  className="space-y-3 rounded-lg border p-3"
+                >
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant={simulator.isActive ? "default" : "secondary"}>
+                    <Badge
+                      variant={simulator.isActive ? "default" : "secondary"}
+                    >
                       {simulator.isActive ? "Activo" : "Archivado"}
                     </Badge>
                     <Badge variant="outline">{simulator.status}</Badge>
-                    <Badge variant={simulator.hasAccessCode ? "default" : "outline"}>
-                      {simulator.hasAccessCode ? "Codigo configurado" : "Sin codigo"}
+                    <Badge
+                      variant={simulator.hasAccessCode ? "default" : "outline"}
+                    >
+                      {simulator.hasAccessCode
+                        ? "Codigo configurado"
+                        : "Sin código"}
                     </Badge>
                   </div>
 
@@ -497,7 +564,8 @@ export function SimulatorsManager({
                         Descripcion
                       </p>
                       <p className="font-medium">
-                        {simulator.description && simulator.description.length > 0
+                        {simulator.description &&
+                        simulator.description.length > 0
                           ? simulator.description
                           : "Sin descripcion"}
                       </p>
@@ -506,7 +574,9 @@ export function SimulatorsManager({
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
                         Duracion
                       </p>
-                      <p className="font-medium">{simulator.durationMinutes} minutos</p>
+                      <p className="font-medium">
+                        {simulator.durationMinutes} minutos
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -529,7 +599,10 @@ export function SimulatorsManager({
                           variant="outline"
                           disabled={busy}
                           onClick={() => {
-                            setEditTitle((prev) => ({ ...prev, [simulator.id]: simulator.title }));
+                            setEditTitle((prev) => ({
+                              ...prev,
+                              [simulator.id]: simulator.title,
+                            }));
                             setEditDescription((prev) => ({
                               ...prev,
                               [simulator.id]: simulator.description ?? "",
@@ -560,19 +633,21 @@ export function SimulatorsManager({
                         className="space-y-3"
                         onSubmit={async (event) => {
                           event.preventDefault();
-                          const didUpdate = await handleUpdateSimulator(simulator, {
-                            title,
-                            campus,
-                            description: description || null,
-                            durationMinutes: Number(durationMinutes),
-                            maxAttempts: Number(maxAttempts),
-                            accessCode:
-                              accessCodeChanged
+                          const didUpdate = await handleUpdateSimulator(
+                            simulator,
+                            {
+                              title,
+                              campus,
+                              description: description || null,
+                              durationMinutes: Number(durationMinutes),
+                              maxAttempts: Number(maxAttempts),
+                              accessCode: accessCodeChanged
                                 ? normalizedAccessCode.length > 0
                                   ? normalizedAccessCode
                                   : null
                                 : undefined,
-                          });
+                            },
+                          );
                           if (didUpdate) {
                             setEditingSimulatorId(null);
                           }
@@ -588,7 +663,10 @@ export function SimulatorsManager({
                           accessCode={accessCode}
                           disabled={busy}
                           onTitleChange={(value) =>
-                            setEditTitle((prev) => ({ ...prev, [simulator.id]: value }))
+                            setEditTitle((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
                           }
                           onDescriptionChange={(value) =>
                             setEditDescription((prev) => ({
@@ -597,7 +675,10 @@ export function SimulatorsManager({
                             }))
                           }
                           onDurationChange={(value) =>
-                            setEditDuration((prev) => ({ ...prev, [simulator.id]: value }))
+                            setEditDuration((prev) => ({
+                              ...prev,
+                              [simulator.id]: value,
+                            }))
                           }
                           onMaxAttemptsChange={(value) =>
                             setEditMaxAttempts((prev) => ({
@@ -623,8 +704,15 @@ export function SimulatorsManager({
                         </Button>
                       </form>
                     </BaseModal>
-                    <Button asChild type="button" variant="outline" disabled={busy}>
-                      <Link href={`/protected/admin/simulators/${simulator.id}/builder`}>
+                    <Button
+                      asChild
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                    >
+                      <Link
+                        href={`/protected/admin/simulators/${simulator.id}/builder`}
+                      >
                         Abrir constructor
                       </Link>
                     </Button>
@@ -653,7 +741,7 @@ export function SimulatorsManager({
                           })
                         }
                       >
-                        Quitar codigo de acceso
+                        Quitar código de acceso
                       </Button>
                     ) : null}
                   </div>
@@ -696,4 +784,3 @@ export function SimulatorsManager({
     </div>
   );
 }
-

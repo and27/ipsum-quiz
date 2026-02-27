@@ -2,7 +2,10 @@ import type {
   StudentVerifyAccessCodeRequest,
   StudentVerifyAccessCodeResponse,
 } from "@/lib/domain/contracts";
-import { mapAuthGuardErrorToResponse, requireStudent } from "@/lib/usecases/auth";
+import {
+  mapAuthGuardErrorToResponse,
+  requireStudent,
+} from "@/lib/usecases/auth";
 import {
   extractClientIpAddress,
   StudentAccessError,
@@ -23,7 +26,10 @@ export async function POST(
     const { simulatorId } = await context.params;
 
     if (!simulatorId) {
-      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID de simulador invalido." },
+        { status: 400 },
+      );
     }
 
     const body = (await request.json().catch(() => null)) as unknown;
@@ -32,7 +38,8 @@ export async function POST(
     }
 
     const payload: StudentVerifyAccessCodeRequest = {
-      accessCode: typeof body.accessCode === "string" ? body.accessCode : undefined,
+      accessCode:
+        typeof body.accessCode === "string" ? body.accessCode : undefined,
     };
 
     await verifySimulatorAccessCodeForStudent({
@@ -59,7 +66,10 @@ export async function POST(
           typeof error.retryAfterSeconds === "number"
             ? { "Retry-After": String(error.retryAfterSeconds) }
             : undefined;
-        return NextResponse.json({ error: error.message }, { status: 429, headers });
+        return NextResponse.json(
+          { error: error.message },
+          { status: 429, headers },
+        );
       }
       if (error.code === "invalid_access_code") {
         return NextResponse.json({ error: error.message }, { status: 401 });
@@ -68,10 +78,8 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "No se pudo verificar el codigo de acceso." },
+      { error: "No se pudo verificar el código de acceso." },
       { status: 500 },
     );
   }
 }
-
-

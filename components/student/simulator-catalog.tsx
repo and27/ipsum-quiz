@@ -95,7 +95,7 @@ export function StudentSimulatorCatalog({
                         Codigo de acceso requerido
                       </p>
                       <Input
-                        placeholder="Ingresa tu codigo"
+                        placeholder="Ingresa tu código"
                         value={accessCodes[simulator.id] ?? ""}
                         onChange={(event) =>
                           setAccessCodes((prev) => ({

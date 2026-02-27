@@ -7,6 +7,7 @@ const ADMIN_LINKS = [
   { href: "/protected/admin/simulators", label: "Simuladores" },
   { href: "/protected/admin/questions", label: "Preguntas" },
   { href: "/protected/admin/topics", label: "Temas" },
+  { href: "/protected/admin/stats", label: "Estadisticas" },
 ];
 
 function isActive(pathname: string, href: string): boolean {

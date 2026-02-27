@@ -529,10 +529,14 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   }
 
   items = await listVersionQuestions(activeVersion.id);
-  const isEditable = !activeVersion.hasAttempts;
-  const lockReason = isEditable
-    ? null
-    : "Esta version esta bloqueada porque ya tiene intentos de estudiantes. Duplicala para seguir editando.";
+  const isEditable = !!draftVersion && !draftVersion.hasAttempts;
+  const lockReason = draftVersion
+    ? draftVersion.hasAttempts
+      ? "Esta version esta bloqueada porque ya tiene intentos de estudiantes. Duplicala para seguir editando."
+      : null
+    : publishedVersion
+      ? "No existe un borrador en este momento. Duplica la version publicada para crear uno."
+      : null;
 
   return {
     simulator,
@@ -561,13 +565,10 @@ async function getEditableVersionForMutations(
 
   const publishedVersion = await getLatestPublishedVersion(simulatorId);
   if (publishedVersion) {
-    if (publishedVersion.hasAttempts) {
-      throw new SimulatorBuilderError(
-        "version_locked",
-        "La version publicada tiene intentos. Duplica esta version para crear un nuevo borrador editable.",
-      );
-    }
-    return publishedVersion;
+    throw new SimulatorBuilderError(
+      "draft_not_found",
+      "No existe un borrador en este momento. Duplica la version publicada para crear uno.",
+    );
   }
 
   return getOrCreateDraftVersion(simulatorId);
