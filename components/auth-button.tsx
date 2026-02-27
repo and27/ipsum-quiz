@@ -19,7 +19,7 @@ export async function AuthButton({ session: initialSession }: AuthButtonProps) {
   ) : (
     <div className="flex gap-2">
       <Button asChild size="sm" variant={"outline"}>
-        <Link href="/auth/login">Iniciar sesion</Link>
+        <Link href="/auth/login">Iniciar sesión</Link>
       </Button>
       <Button asChild size="sm" variant={"default"}>
         <Link href="/auth/sign-up">Registrarse</Link>

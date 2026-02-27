@@ -109,7 +109,9 @@ export function SignUpForm({
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    aria-label={
+                      showPassword ? "Ocultar contrasena" : "Mostrar contrasena"
+                    }
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -138,7 +140,11 @@ export function SignUpForm({
                         : "Mostrar contrasena repetida"
                     }
                   >
-                    {showRepeatPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showRepeatPassword ? (
+                      <EyeOff size={16} />
+                    ) : (
+                      <Eye size={16} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -150,7 +156,7 @@ export function SignUpForm({
             <div className="mt-4 text-center text-sm">
               Ya tienes una cuenta?{" "}
               <Link href="/auth/login" className="underline underline-offset-4">
-                Iniciar sesion
+                Iniciar sesión
               </Link>
             </div>
           </form>

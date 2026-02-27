@@ -107,7 +107,9 @@ export function LoginForm({
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    aria-label={
+                      showPassword ? "Ocultar contrasena" : "Mostrar contrasena"
+                    }
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -115,7 +117,7 @@ export function LoginForm({
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Iniciando sesion..." : "Iniciar sesion"}
+                {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
               </Button>
             </div>
             <div className="mt-4 text-center text-sm">

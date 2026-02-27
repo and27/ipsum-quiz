@@ -13,5 +13,5 @@ export function LogoutButton() {
     router.push("/auth/login");
   };
 
-  return <Button onClick={logout}>Cerrar sesion</Button>;
+  return <Button onClick={logout}>Cerrar sesión</Button>;
 }

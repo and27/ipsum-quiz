@@ -50,7 +50,9 @@ export function ForgotPasswordForm({
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Revisa tu correo</CardTitle>
-            <CardDescription>Se enviaron instrucciones para restablecer la contrasena</CardDescription>
+            <CardDescription>
+              Se enviaron instrucciones para restablecer la contrasena
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -93,7 +95,7 @@ export function ForgotPasswordForm({
                   href="/auth/login"
                   className="underline underline-offset-4"
                 >
-                  Iniciar sesion
+                  Iniciar sesión
                 </Link>
               </div>
             </form>
