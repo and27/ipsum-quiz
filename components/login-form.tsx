@@ -16,8 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 
 export function LoginForm({
   className,
@@ -29,6 +29,20 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const signupSuccess = searchParams.get("signup") === "success";
+  const resetSuccess = searchParams.get("reset") === "success";
+  const signupEmail = searchParams.get("email") ?? "";
+
+  const helperMessage = useMemo(() => {
+    if (resetSuccess) {
+      return "Tu contrasena se actualizo. Inicia sesion con la nueva contrasena.";
+    }
+    if (signupSuccess) {
+      return "Tu cuenta fue creada. Inicia sesion.";
+    }
+    return null;
+  }, [resetSuccess, signupSuccess]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +87,11 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
+              {helperMessage ? (
+                <p className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700">
+                  {helperMessage}
+                </p>
+              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

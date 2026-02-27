@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { prepareImageForUpload } from "@/lib/usecases/images/client";
 import Link from "next/link";
@@ -432,13 +433,6 @@ export function QuestionsManager({
   }
 
   async function handleDeleteQuestion(question: Question): Promise<void> {
-    const confirmed = window.confirm(
-      "Esta accion eliminara la pregunta de forma permanente. ¿Deseas continuar?",
-    );
-    if (!confirmed) {
-      return;
-    }
-
     setRowBusy((prev) => ({ ...prev, [question.id]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -739,14 +733,17 @@ export function QuestionsManager({
                     >
                       {question.isActive ? "Archivar" : "Reactivar"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={busy || uploadingImage}
-                      onClick={() => handleDeleteQuestion(question)}
-                    >
-                      Eliminar
-                    </Button>
+                    <ConfirmModal
+                      title="Eliminar pregunta"
+                      description="Esta accion eliminara la pregunta de forma permanente."
+                      confirmLabel="Eliminar"
+                      destructive
+                      disabled={uploadingImage}
+                      busy={busy}
+                      triggerLabel="Eliminar"
+                      triggerVariant="destructive"
+                      onConfirm={() => handleDeleteQuestion(question)}
+                    />
                   </div>
                   {!question.isBankReady && !question.isActive ? (
                     <p className="text-xs text-amber-600">

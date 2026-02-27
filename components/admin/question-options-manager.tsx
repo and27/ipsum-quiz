@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { useMemo, useState } from "react";
 
@@ -168,11 +169,6 @@ export function QuestionOptionsManager({
   }
 
   async function handleDeleteOption(option: QuestionOption) {
-    const confirmed = window.confirm("Eliminar esta opcion?");
-    if (!confirmed) {
-      return;
-    }
-
     setRowBusy((prev) => ({ ...prev, [option.id]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -351,14 +347,16 @@ export function QuestionOptionsManager({
                     >
                       {option.isActive ? "Desactivar" : "Activar"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={busy}
-                      onClick={() => handleDeleteOption(option)}
-                    >
-                      Eliminar
-                    </Button>
+                    <ConfirmModal
+                      title="Eliminar opcion"
+                      description="Esta accion eliminara la opcion de forma permanente."
+                      confirmLabel="Eliminar"
+                      destructive
+                      busy={busy}
+                      triggerLabel="Eliminar"
+                      triggerVariant="destructive"
+                      onConfirm={() => handleDeleteOption(option)}
+                    />
                   </div>
                 </div>
               );

@@ -23,6 +23,7 @@ export function SignUpForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
@@ -49,11 +50,16 @@ export function SignUpForm({
         email,
         password,
         options: {
+          data: {
+            full_name: fullName.trim(),
+          },
           emailRedirectTo: `${window.location.origin}/protected`,
         },
       });
       if (error) throw error;
-      router.push("/auth/sign-up-success");
+      router.push(
+        `/auth/login?signup=success&email=${encodeURIComponent(email.trim())}`,
+      );
     } catch (error: unknown) {
       setError(getAuthErrorMessageInSpanish(error));
     } finally {
@@ -81,6 +87,17 @@ export function SignUpForm({
         <CardContent>
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="full-name">Nombre completo</Label>
+                <Input
+                  id="full-name"
+                  type="text"
+                  placeholder="Tu nombre y apellido"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

@@ -24,6 +24,15 @@ export function getAuthErrorMessageInSpanish(error: unknown): string {
   if (message.includes("too many requests")) {
     return "Demasiados intentos. Intenta de nuevo en unos minutos.";
   }
+  if (message.includes("same password")) {
+    return "La nueva contrasena debe ser distinta a la actual.";
+  }
+  if (message.includes("token has expired") || message.includes("expired")) {
+    return "El enlace expiro. Solicita uno nuevo.";
+  }
+  if (message.includes("otp") && message.includes("invalid")) {
+    return "El enlace no es valido. Solicita uno nuevo.";
+  }
 
   return rawMessage;
 }

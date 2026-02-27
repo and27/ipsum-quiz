@@ -69,8 +69,7 @@ async function StudentAttemptResultContent({
           <div className="mt-3 space-y-2">
             {result.attempt.topicScores.map((topic) => (
               <p key={topic.topicId} className="text-sm text-muted-foreground">
-                {topic.topicName}: Correctas {topic.correctCount} | En blanco {topic.blankCount} | Incorrectas{" "}
-                {Math.max(topic.totalCount - topic.correctCount - topic.blankCount, 0)} | Total {topic.totalCount}
+                {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
             {result.attempt.topicScores.length === 0 ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { getAuthErrorMessageInSpanish } from "@/lib/auth-error-messages";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,14 +32,13 @@ export function ForgotPasswordForm({
     setError(null);
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/update-password`,
       });
       if (error) throw error;
       setSuccess(true);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ocurrio un error");
+      setError(getAuthErrorMessageInSpanish(error));
     } finally {
       setIsLoading(false);
     }
@@ -54,13 +54,39 @@ export function ForgotPasswordForm({
               Se enviaron instrucciones para restablecer la contrasena
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Si te registraste con correo y contrasena, recibiras un correo
-              para restablecerla.
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Si te registraste con correo y contrasena, recibiras un correo
+                para restablecerla.
+              </p>
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={isLoading}
+                  onClick={async () => {
+                    const supabase = createClient();
+                    setIsLoading(true);
+                    setError(null);
+                    try {
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}/auth/update-password`,
+                      });
+                      if (error) throw error;
+                    } catch (err: unknown) {
+                      setError(getAuthErrorMessageInSpanish(err));
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  {isLoading ? "Reenviando..." : "Reenviar correo"}
+                </Button>
+                {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+              </div>
+            </CardContent>
+          </Card>
       ) : (
         <Card>
           <CardHeader>

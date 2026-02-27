@@ -205,8 +205,7 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                 key={topic.topicName}
                 className="text-sm text-muted-foreground"
               >
-                {topic.topicName}: Correctas {topic.correctCount} | En blanco {topic.blankCount} | Incorrectas{" "}
-                {Math.max(topic.totalCount - topic.correctCount - topic.blankCount, 0)} | Total {topic.totalCount}
+                {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
           </div>
@@ -338,14 +337,16 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
             >
               Siguiente
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={finishAttempt}
-              disabled={isExpired || isFinishing}
-            >
-              {isFinishing ? "Finalizando..." : "Finalizar intento"}
-            </Button>
+            {currentIndex === questions.length - 1 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={finishAttempt}
+                disabled={isExpired || isFinishing}
+              >
+                {isFinishing ? "Finalizando..." : "Finalizar intento"}
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>

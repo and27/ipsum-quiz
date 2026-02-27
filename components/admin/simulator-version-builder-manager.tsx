@@ -11,6 +11,7 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { useEffect, useMemo, useState } from "react";
 
@@ -223,11 +224,6 @@ export function SimulatorVersionBuilderManager({
   }
 
   async function handleDelete(item: SimulatorVersionQuestion) {
-    const confirmed = window.confirm("Quitar esta pregunta de la version borrador?");
-    if (!confirmed) {
-      return;
-    }
-
     setRowBusy((prev) => ({ ...prev, [item.id]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -511,14 +507,17 @@ export function SimulatorVersionBuilderManager({
                     >
                       Bajar
                     </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={busy || !isEditable}
-                      onClick={() => handleDelete(item)}
-                    >
-                      Quitar
-                    </Button>
+                    <ConfirmModal
+                      title="Quitar pregunta del borrador"
+                      description="Esta accion quitara la pregunta de la version borrador."
+                      confirmLabel="Quitar"
+                      destructive
+                      disabled={!isEditable}
+                      busy={busy}
+                      triggerLabel="Quitar"
+                      triggerVariant="destructive"
+                      onConfirm={() => handleDelete(item)}
+                    />
                   </div>
                 </div>
               );
