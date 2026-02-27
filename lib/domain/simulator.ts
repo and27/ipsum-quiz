@@ -63,6 +63,7 @@ export interface TopicScore {
   topicId: UUID;
   topicName: string;
   correctCount: number;
+  blankCount: number;
   totalCount: number;
 }
 
@@ -76,6 +77,7 @@ export interface AttemptSummary {
   expiresAt: ISODateTimeString;
   finishedAt: ISODateTimeString | null;
   scoreTotal: number | null;
+  blankCount: number | null;
   questionsTotal: number;
 }
 

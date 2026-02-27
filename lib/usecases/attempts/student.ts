@@ -68,12 +68,14 @@ interface RawAttemptSummaryRow {
   expires_at: string;
   finished_at: string | null;
   score_total: number | null;
+  blank_count: number | null;
   questions_total: number;
 }
 
 interface RawAttemptTopicScoreRow {
   topic_id: string;
   correct_count: number;
+  blank_count: number | null;
   total_count: number;
   topics: { name?: unknown } | Array<{ name?: unknown }> | null;
 }
@@ -102,6 +104,7 @@ interface TopicScoreAggregate {
   topicName: string;
   totalCount: number;
   correctCount: number;
+  blankCount: number;
 }
 
 interface RawAttemptAnswerDetailRow {
@@ -180,6 +183,7 @@ function parseAttemptSummaryRow(row: unknown) {
     typeof value.expires_at !== "string" ||
     (value.finished_at !== null && typeof value.finished_at !== "string") ||
     (value.score_total !== null && typeof value.score_total !== "number") ||
+    (value.blank_count !== null && typeof value.blank_count !== "number") ||
     typeof value.questions_total !== "number"
   ) {
     return null;
@@ -195,6 +199,7 @@ function parseAttemptSummaryRow(row: unknown) {
     expiresAt: value.expires_at,
     finishedAt: value.finished_at,
     scoreTotal: value.score_total,
+    blankCount: value.blank_count,
     questionsTotal: value.questions_total,
   };
 }
@@ -407,7 +412,7 @@ function mapStartRpcError(error: unknown): StudentAttemptError {
 async function calculateAndPersistAttemptScores(
   supabase: DbClient,
   attemptId: string,
-): Promise<{ scoreTotal: number; topicScores: TopicScoreAggregate[] }> {
+): Promise<{ scoreTotal: number; blankCount: number; topicScores: TopicScoreAggregate[] }> {
   const { data: scoreRows, error: scoreError } = await supabase.rpc(
     "get_attempt_score_rows",
     {
@@ -426,6 +431,7 @@ async function calculateAndPersistAttemptScores(
   const rows = (scoreRows ?? []) as RawScoreRow[];
   const topicMap = new Map<string, TopicScoreAggregate>();
   let scoreTotal = 0;
+  let blankCount = 0;
 
   for (const row of rows) {
     if (
@@ -446,6 +452,7 @@ async function calculateAndPersistAttemptScores(
       !!selectedOptionId &&
       !!correctOptionId &&
       selectedOptionId === correctOptionId;
+    const isBlank = !selectedOptionId;
 
     const key = row.question_topic_id;
     const current = topicMap.get(key) ?? {
@@ -454,11 +461,16 @@ async function calculateAndPersistAttemptScores(
         row.topic_name && typeof row.topic_name === "string" ? row.topic_name : key,
       totalCount: 0,
       correctCount: 0,
+      blankCount: 0,
     };
     current.totalCount += 1;
     if (isCorrect) {
       current.correctCount += 1;
       scoreTotal += 1;
+    }
+    if (isBlank) {
+      current.blankCount += 1;
+      blankCount += 1;
     }
     topicMap.set(key, current);
   }
@@ -485,6 +497,7 @@ async function calculateAndPersistAttemptScores(
           attempt_id: attemptId,
           topic_id: topic.topicId,
           correct_count: topic.correctCount,
+          blank_count: topic.blankCount,
           total_count: topic.totalCount,
         })),
       );
@@ -513,6 +526,7 @@ async function calculateAndPersistAttemptScores(
 
   return {
     scoreTotal,
+    blankCount,
     topicScores,
   };
 }
@@ -524,10 +538,11 @@ async function closeAttemptWithScores(
   attemptId: string;
   status: "finished" | "expired";
   scoreTotal: number;
+  blankCount: number;
   questionsTotal: number;
   topicScores: TopicScoreAggregate[];
 } | null> {
-  const { scoreTotal, topicScores } = await calculateAndPersistAttemptScores(
+  const { scoreTotal, blankCount, topicScores } = await calculateAndPersistAttemptScores(
     supabase,
     input.attemptId,
   );
@@ -539,6 +554,7 @@ async function closeAttemptWithScores(
       status: input.status,
       finished_at: nowIso,
       score_total: scoreTotal,
+      blank_count: blankCount,
     })
     .eq("id", input.attemptId)
     .eq("status", "active")
@@ -559,6 +575,7 @@ async function closeAttemptWithScores(
       typeof closedAttempt.score_total === "number"
         ? closedAttempt.score_total
         : scoreTotal,
+    blankCount,
     questionsTotal: closedAttempt.questions_total,
     topicScores,
   };
@@ -657,10 +674,33 @@ async function loadAttemptQuestionResults(
         correctOptionText:
           correctTextByQuestionId.get(row.simulator_version_question_id) ?? null,
         isCorrect: row.is_correct === true,
+        isBlank: row.selected_option_id === null,
       } satisfies FinishAttemptQuestionResult;
     })
     .filter((row): row is FinishAttemptQuestionResult => !!row)
     .sort((a, b) => a.position - b.position);
+}
+
+async function resolveAttemptBlankCount(
+  supabase: DbClient,
+  attemptId: string,
+  persistedBlankCount: number | null,
+): Promise<number> {
+  if (typeof persistedBlankCount === "number") {
+    return Math.max(0, persistedBlankCount);
+  }
+
+  const { count, error } = await supabase
+    .from("attempt_answers")
+    .select("id", { count: "exact", head: true })
+    .eq("attempt_id", attemptId)
+    .is("selected_option_id", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
 }
 
 async function expireAttemptIfActive(
@@ -1042,6 +1082,13 @@ export async function finishAttemptForStudent(input: {
     attemptId: finishedAttempt.attemptId,
     status: "finished",
     scoreTotal: finishedAttempt.scoreTotal,
+    blankCount: finishedAttempt.blankCount,
+    incorrectCount: Math.max(
+      (finishedAttempt.questionsTotal ?? attemptRow.questions_total) -
+        finishedAttempt.scoreTotal -
+        finishedAttempt.blankCount,
+      0,
+    ),
     questionsTotal: finishedAttempt.questionsTotal ?? attemptRow.questions_total,
     topicScores: finishedAttempt.topicScores,
     questionResults,
@@ -1105,7 +1152,7 @@ export async function listAttemptHistoryForStudent(input: {
   const { data, error, count } = await supabase
     .from("attempts")
     .select(
-      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, questions_total",
+      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, blank_count, questions_total",
       { count: "exact" },
     )
     .eq("student_id", input.studentId)
@@ -1142,7 +1189,7 @@ export async function getAttemptResultForStudent(input: {
   const { data, error } = await supabase
     .from("attempts")
     .select(
-      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, questions_total",
+      "id, simulator_id, simulator_version_id, student_id, status, started_at, expires_at, finished_at, score_total, blank_count, questions_total",
     )
     .eq("id", input.attemptId)
     .eq("student_id", input.studentId)
@@ -1159,9 +1206,15 @@ export async function getAttemptResultForStudent(input: {
     );
   }
 
+  const blankCount = await resolveAttemptBlankCount(
+    supabase,
+    input.attemptId,
+    attempt.blankCount,
+  );
+
   const { data: topicRows, error: topicError } = await supabase
     .from("attempt_topic_scores")
-    .select("topic_id, correct_count, total_count, topics(name)")
+    .select("topic_id, correct_count, blank_count, total_count, topics(name)")
     .eq("attempt_id", input.attemptId);
 
   if (topicError) {
@@ -1179,12 +1232,14 @@ export async function getAttemptResultForStudent(input: {
       topicId: row.topic_id,
       topicName: extractTopicName(row.topics, row.topic_id),
       correctCount: row.correct_count,
+      blankCount: typeof row.blank_count === "number" ? row.blank_count : 0,
       totalCount: row.total_count,
     }));
 
   return {
     attempt: {
       ...attempt,
+      blankCount,
       topicScores,
     },
   };

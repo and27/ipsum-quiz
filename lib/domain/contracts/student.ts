@@ -102,12 +102,15 @@ export interface FinishAttemptQuestionResult {
   selectedOptionText: string | null;
   correctOptionText: string | null;
   isCorrect: boolean;
+  isBlank: boolean;
 }
 
 export interface FinishAttemptResponse {
   attemptId: UUID;
   status: "finished" | "expired";
   scoreTotal: number;
+  blankCount: number;
+  incorrectCount: number;
   questionsTotal: number;
   topicScores: TopicScore[];
   questionResults: FinishAttemptQuestionResult[];

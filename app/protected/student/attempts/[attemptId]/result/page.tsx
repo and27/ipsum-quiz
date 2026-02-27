@@ -20,6 +20,16 @@ async function StudentAttemptResultContent({
       studentId: session.userId,
       attemptId,
     });
+    const scoreTotal = result.attempt.scoreTotal ?? 0;
+    const blankCount = result.attempt.blankCount ?? 0;
+    const incorrectCount = Math.max(
+      result.attempt.questionsTotal - scoreTotal - blankCount,
+      0,
+    );
+    const percent =
+      result.attempt.questionsTotal > 0
+        ? Math.round((scoreTotal / result.attempt.questionsTotal) * 100)
+        : 0;
 
     return (
       <div className="flex w-full flex-col gap-6">
@@ -38,7 +48,10 @@ async function StudentAttemptResultContent({
             Estado: <strong>{result.attempt.status}</strong>
           </p>
           <p className="text-sm text-muted-foreground">
-            Puntaje: {result.attempt.scoreTotal ?? 0}/{result.attempt.questionsTotal}
+            Puntaje: {scoreTotal}/{result.attempt.questionsTotal} ({percent}%)
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Correctas: {scoreTotal} | Incorrectas: {incorrectCount} | En blanco: {blankCount}
           </p>
           <p className="text-xs text-muted-foreground">
             Inicio: {new Date(result.attempt.startedAt).toLocaleString()}
@@ -56,7 +69,8 @@ async function StudentAttemptResultContent({
           <div className="mt-3 space-y-2">
             {result.attempt.topicScores.map((topic) => (
               <p key={topic.topicId} className="text-sm text-muted-foreground">
-                {topic.topicName}: {topic.correctCount}/{topic.totalCount}
+                {topic.topicName}: Correctas {topic.correctCount} | En blanco {topic.blankCount} | Incorrectas{" "}
+                {Math.max(topic.totalCount - topic.correctCount - topic.blankCount, 0)} | Total {topic.totalCount}
               </p>
             ))}
             {result.attempt.topicScores.length === 0 ? (

@@ -59,10 +59,13 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
   const saveRequestVersionRef = useRef<Record<string, number>>({});
   const [finishResult, setFinishResult] = useState<{
     scoreTotal: number;
+    blankCount: number;
+    incorrectCount: number;
     questionsTotal: number;
     topicScores: Array<{
       topicName: string;
       correctCount: number;
+      blankCount: number;
       totalCount: number;
     }>;
     questionResults: FinishAttemptQuestionResult[];
@@ -137,10 +140,13 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
     try {
       const payload = await parseApiResponse<{
         scoreTotal: number;
+        blankCount: number;
+        incorrectCount: number;
         questionsTotal: number;
         topicScores: Array<{
           topicName: string;
           correctCount: number;
+          blankCount: number;
           totalCount: number;
         }>;
         questionResults: FinishAttemptQuestionResult[];
@@ -188,6 +194,9 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
               {finishResult.scoreTotal}/{finishResult.questionsTotal}
             </p>
             <p className="mt-2 text-xl font-semibold text-primary">{scorePercent}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Correctas: {finishResult.scoreTotal} | Incorrectas: {finishResult.incorrectCount} | En blanco: {finishResult.blankCount}
+            </p>
           </div>
           <div className="space-y-1">
             <p className="text-sm font-medium">Desglose por tema</p>
@@ -196,7 +205,8 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                 key={topic.topicName}
                 className="text-sm text-muted-foreground"
               >
-                {topic.topicName}: {topic.correctCount}/{topic.totalCount}
+                {topic.topicName}: Correctas {topic.correctCount} | En blanco {topic.blankCount} | Incorrectas{" "}
+                {Math.max(topic.totalCount - topic.correctCount - topic.blankCount, 0)} | Total {topic.totalCount}
               </p>
             ))}
           </div>
@@ -226,10 +236,14 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                   </p>
                   <p
                     className={`text-sm font-medium ${
-                      item.isCorrect ? "text-green-600" : "text-red-500"
+                      item.isCorrect
+                        ? "text-green-600"
+                        : item.isBlank
+                          ? "text-amber-600"
+                          : "text-red-500"
                     }`}
                   >
-                    {item.isCorrect ? "Correcta" : "Incorrecta"}
+                    {item.isCorrect ? "Correcta" : item.isBlank ? "En blanco" : "Incorrecta"}
                   </p>
                 </div>
               ))}
