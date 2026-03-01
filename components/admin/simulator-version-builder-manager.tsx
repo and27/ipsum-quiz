@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { Input } from "@/components/ui/input";
 import { useEffect, useMemo, useState } from "react";
 
 interface SimulatorVersionBuilderManagerProps {
@@ -55,10 +54,6 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-function buildEditPositions(items: SimulatorVersionQuestion[]): Record<string, string> {
-  return Object.fromEntries(items.map((item) => [item.id, String(item.position)]));
-}
-
 export function SimulatorVersionBuilderManager({
   simulatorId,
   initialState,
@@ -70,9 +65,6 @@ export function SimulatorVersionBuilderManager({
   const [publishedVersion, setPublishedVersion] = useState(initialState.publishedVersion);
   const [isEditable, setIsEditable] = useState(initialState.isEditable);
   const [lockReason, setLockReason] = useState(initialState.lockReason);
-  const [editPositions, setEditPositions] = useState<Record<string, string>>(
-    () => buildEditPositions(initialState.items),
-  );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
@@ -93,6 +85,38 @@ export function SimulatorVersionBuilderManager({
       (question) => question.isBankReady && !existingSourceQuestionIds.has(question.id),
     );
   }, [availableQuestions, items]);
+
+  const groupedAvailableToAdd = useMemo(() => {
+    const grouped = new Map<string, Question[]>();
+
+    for (const question of availableToAdd) {
+      const key = question.topicName;
+      const current = grouped.get(key) ?? [];
+      current.push(question);
+      grouped.set(key, current);
+    }
+
+    return Array.from(grouped.entries()).map(([topicName, questions]) => ({
+      topicName,
+      questions,
+    }));
+  }, [availableToAdd]);
+
+  const groupedItems = useMemo(() => {
+    const grouped = new Map<string, SimulatorVersionQuestion[]>();
+
+    for (const item of items) {
+      const key = item.topicName;
+      const current = grouped.get(key) ?? [];
+      current.push(item);
+      grouped.set(key, current);
+    }
+
+    return Array.from(grouped.entries()).map(([topicName, questions]) => ({
+      topicName,
+      questions,
+    }));
+  }, [items]);
 
   useEffect(() => {
     if (availableToAdd.length === 0) {
@@ -136,7 +160,6 @@ export function SimulatorVersionBuilderManager({
     });
     const payload = await parseApiResponse<AdminSimulatorBuilderStateResponse>(response);
     setItems(payload.items);
-    setEditPositions(buildEditPositions(payload.items));
     setActiveVersion(payload.activeVersion);
     setDraftVersion(payload.draftVersion);
     setPublishedVersion(payload.publishedVersion);
@@ -190,33 +213,6 @@ export function SimulatorVersionBuilderManager({
       );
     } finally {
       setIsAdding(false);
-    }
-  }
-
-  async function handleReorder(item: SimulatorVersionQuestion, nextPosition: number) {
-    setRowBusy((prev) => ({ ...prev, [item.id]: true }));
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setValidationResult(null);
-
-    try {
-      const response = await fetch(
-        `/api/admin/simulators/${simulatorId}/builder/${item.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ position: nextPosition }),
-        },
-      );
-      await parseApiResponse<{ item: SimulatorVersionQuestion }>(response);
-      setSuccessMessage("Pregunta del borrador reordenada.");
-      await loadState();
-    } catch (error: unknown) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo reordenar la pregunta del borrador.",
-      );
-    } finally {
-      setRowBusy((prev) => ({ ...prev, [item.id]: false }));
     }
   }
 
@@ -379,23 +375,26 @@ export function SimulatorVersionBuilderManager({
                 </div>
               </div>
               <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3">
-                {availableToAdd.map((question) => (
-                  <label
-                    key={question.id}
-                    className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedQuestionIds.includes(question.id)}
-                      onChange={() => toggleQuestionSelection(question.id)}
-                      disabled={isAdding || !isEditable}
-                    />
-                    <span>
-                      <span className="font-medium">{question.topicName}</span>
-                      {" - "}
-                      {question.statement}
-                    </span>
-                  </label>
+                {groupedAvailableToAdd.map((group) => (
+                  <div key={group.topicName} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {group.topicName}
+                    </p>
+                    {group.questions.map((question) => (
+                      <label
+                        key={question.id}
+                        className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedQuestionIds.includes(question.id)}
+                          onChange={() => toggleQuestionSelection(question.id)}
+                          disabled={isAdding || !isEditable}
+                        />
+                        <span>{question.statement}</span>
+                      </label>
+                    ))}
+                  </div>
                 ))}
                 {availableToAdd.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
@@ -405,6 +404,9 @@ export function SimulatorVersionBuilderManager({
               </div>
               <p className="text-xs text-muted-foreground">
                 Seleccionadas: {selectedQuestionIds.length}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                El orden final se agrupa automaticamente por tema segun el orden configurado en Temas.
               </p>
             </div>
             <Button
@@ -437,81 +439,53 @@ export function SimulatorVersionBuilderManager({
             <p className="text-sm text-green-600">{successMessage}</p>
           ) : null}
 
-          <div className="space-y-3">
-            {items.map((item, index) => {
-              const busy = !!rowBusy[item.id];
-              const nextPosition = Number(editPositions[item.id] ?? item.position);
-
-              return (
-                <div key={item.id} className="space-y-3 rounded-lg border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>#{item.position}</Badge>
-                    <Badge variant="outline">{item.topicName}</Badge>
-                  </div>
-                  <p className="text-sm">{item.statement}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={editPositions[item.id] ?? String(item.position)}
-                      onChange={(event) =>
-                        setEditPositions((prev) => ({
-                          ...prev,
-                          [item.id]: event.target.value,
-                        }))
-                      }
-                      disabled={busy || !isEditable}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={
-                        busy ||
-                        !isEditable ||
-                        !Number.isFinite(nextPosition) ||
-                        nextPosition <= 0
-                      }
-                      onClick={() => handleReorder(item, nextPosition)}
-                    >
-                      Mover
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy || !isEditable || index === 0}
-                      onClick={() => handleReorder(item, item.position - 1)}
-                    >
-                      Subir
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy || !isEditable || index === items.length - 1}
-                      onClick={() => handleReorder(item, item.position + 1)}
-                    >
-                      Bajar
-                    </Button>
-                    <ConfirmModal
-                      title="Quitar pregunta del borrador"
-                      description="Esta accion quitara la pregunta de la version borrador."
-                      confirmLabel="Quitar"
-                      destructive
-                      disabled={!isEditable}
-                      busy={busy}
-                      triggerLabel="Quitar"
-                      triggerVariant="destructive"
-                      onConfirm={() => handleDelete(item)}
-                    />
-                  </div>
+          <div className="space-y-4">
+            {groupedItems.map((group) => (
+              <div key={group.topicName} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{group.topicName}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {group.questions.length} preguntas en este bloque
+                  </span>
                 </div>
-              );
-            })}
+                {group.questions.map((item) => {
+                  const busy = !!rowBusy[item.id];
+
+                  return (
+                    <div key={item.id} className="space-y-3 rounded-lg border p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge>#{item.position}</Badge>
+                      </div>
+                      <p className="text-sm">{item.statement}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <ConfirmModal
+                          title="Quitar pregunta del borrador"
+                          description="Esta accion quitara la pregunta de la version borrador."
+                          confirmLabel="Quitar"
+                          destructive
+                          disabled={!isEditable}
+                          busy={busy}
+                          triggerLabel="Quitar"
+                          triggerVariant="destructive"
+                          onConfirm={() => handleDelete(item)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               La version borrador aun no tiene preguntas.
             </p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              El orden se calcula por bloques de tema. Si quieres cambiarlo, ajusta el orden en
+              la seccion de Temas.
+            </p>
+          )}
         </CardContent>
       </Card>
 

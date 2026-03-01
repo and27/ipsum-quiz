@@ -10,10 +10,10 @@ export interface AdminTopicCreateRequest {
 
 export interface AdminTopicUpdateRequest {
   name?: string;
+  displayOrder?: number;
   isActive?: boolean;
 }
 
 export interface AdminTopicResponse {
   topic: Topic;
 }
-

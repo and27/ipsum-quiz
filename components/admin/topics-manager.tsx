@@ -40,10 +40,19 @@ function buildEditNames(topics: Topic[]): Record<string, string> {
   return Object.fromEntries(topics.map((topic) => [topic.id, topic.name]));
 }
 
+function buildEditOrders(topics: Topic[]): Record<string, string> {
+  return Object.fromEntries(
+    topics.map((topic) => [topic.id, String(topic.displayOrder)]),
+  );
+}
+
 export function TopicsManager({ initialTopics }: TopicsManagerProps) {
   const [topics, setTopics] = useState<Topic[]>(initialTopics);
   const [editNames, setEditNames] = useState<Record<string, string>>(
     () => buildEditNames(initialTopics),
+  );
+  const [editOrders, setEditOrders] = useState<Record<string, string>>(
+    () => buildEditOrders(initialTopics),
   );
   const [newTopicName, setNewTopicName] = useState("");
   const [includeInactive, setIncludeInactive] = useState(true);
@@ -74,6 +83,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
       const payload = await parseApiResponse<AdminTopicsListResponse>(response);
       setTopics(payload.items);
       setEditNames(buildEditNames(payload.items));
+      setEditOrders(buildEditOrders(payload.items));
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los temas.");
     } finally {
@@ -191,8 +201,11 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
             {topics.map((topic) => {
               const pending = !!rowBusy[topic.id];
               const currentName = editNames[topic.id] ?? topic.name;
+              const currentOrder = editOrders[topic.id] ?? String(topic.displayOrder);
               const canSaveName =
-                currentName.trim().length > 0 && currentName.trim() !== topic.name;
+                currentName.trim().length > 0 &&
+                (currentName.trim() !== topic.name ||
+                  Number(currentOrder) !== topic.displayOrder);
 
               return (
                 <div
@@ -203,6 +216,22 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                     <Badge variant={topic.isActive ? "default" : "secondary"}>
                       {topic.isActive ? "Activo" : "Inactivo"}
                     </Badge>
+                  </div>
+
+                  <div className="w-full sm:w-24">
+                    <Input
+                      type="number"
+                      min={1}
+                      aria-label={`Orden del tema ${topic.name}`}
+                      value={currentOrder}
+                      onChange={(event) =>
+                        setEditOrders((prev) => ({
+                          ...prev,
+                          [topic.id]: event.target.value,
+                        }))
+                      }
+                      disabled={pending}
+                    />
                   </div>
 
                   <div className="flex-1">
@@ -226,6 +255,7 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                       onClick={() =>
                         handleUpdateTopic(topic, {
                           name: currentName,
+                          displayOrder: Number(currentOrder),
                         })
                       }
                     >

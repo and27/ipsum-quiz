@@ -29,11 +29,18 @@ export async function PATCH(
     if (typeof body.name === "string") {
       payload.name = body.name;
     }
+    if (typeof body.displayOrder === "number") {
+      payload.displayOrder = body.displayOrder;
+    }
     if (typeof body.isActive === "boolean") {
       payload.isActive = body.isActive;
     }
 
-    if (typeof payload.name === "undefined" && typeof payload.isActive === "undefined") {
+    if (
+      typeof payload.name === "undefined" &&
+      typeof payload.displayOrder === "undefined" &&
+      typeof payload.isActive === "undefined"
+    ) {
       return NextResponse.json({ error: "No se proporcionaron cambios." }, { status: 400 });
     }
 

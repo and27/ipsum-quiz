@@ -350,7 +350,7 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("simulator_version_questions")
-    .select("id, position")
+    .select("id, position, topic_id, topics(display_order)")
     .eq("simulator_version_id", versionId)
     .order("position", { ascending: true });
 
@@ -358,7 +358,31 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
     throw new Error(error.message);
   }
 
-  const rows = (data ?? []) as Array<{ id: string; position: number }>;
+  const rows = ((data ?? []) as Array<{
+    id: string;
+    position: number;
+    topic_id: string;
+    topics?: { display_order?: unknown } | Array<{ display_order?: unknown }> | null;
+  }>).sort((a, b) => {
+    const aOrder = Array.isArray(a.topics)
+      ? a.topics[0]?.display_order
+      : a.topics?.display_order;
+    const bOrder = Array.isArray(b.topics)
+      ? b.topics[0]?.display_order
+      : b.topics?.display_order;
+    const normalizedAOrder = typeof aOrder === "number" ? aOrder : Number.MAX_SAFE_INTEGER;
+    const normalizedBOrder = typeof bOrder === "number" ? bOrder : Number.MAX_SAFE_INTEGER;
+
+    if (normalizedAOrder !== normalizedBOrder) {
+      return normalizedAOrder - normalizedBOrder;
+    }
+
+    if (a.topic_id !== b.topic_id) {
+      return a.topic_id.localeCompare(b.topic_id);
+    }
+
+    return a.position - b.position;
+  });
   const maxPosition = rows.reduce(
     (max, row) => (row.position > max ? row.position : max),
     0,
@@ -380,45 +404,6 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
       .update({ position: index + 1 })
       .eq("simulator_version_id", versionId)
       .eq("id", rows[index].id);
-    if (finalError) {
-      throw new Error(finalError.message);
-    }
-  }
-}
-
-async function reorderByIds(versionId: string, orderedIds: string[]): Promise<void> {
-  const supabase = await createClient();
-  const { data: rows, error: rowsError } = await supabase
-    .from("simulator_version_questions")
-    .select("id, position")
-    .eq("simulator_version_id", versionId);
-
-  if (rowsError) {
-    throw new Error(rowsError.message);
-  }
-
-  const maxPosition = (rows ?? []).reduce(
-    (max, row) => (row.position > max ? row.position : max),
-    0,
-  );
-
-  for (let index = 0; index < orderedIds.length; index += 1) {
-    const { error: tempError } = await supabase
-      .from("simulator_version_questions")
-      .update({ position: maxPosition + index + 1 })
-      .eq("simulator_version_id", versionId)
-      .eq("id", orderedIds[index]);
-    if (tempError) {
-      throw new Error(tempError.message);
-    }
-  }
-
-  for (let index = 0; index < orderedIds.length; index += 1) {
-    const { error: finalError } = await supabase
-      .from("simulator_version_questions")
-      .update({ position: index + 1 })
-      .eq("simulator_version_id", versionId)
-      .eq("id", orderedIds[index]);
     if (finalError) {
       throw new Error(finalError.message);
     }
@@ -702,27 +687,8 @@ export async function addQuestionToDraftVersion(
     }
   }
 
-  if (typeof requestedPosition === "number") {
-    const normalizedPosition = Math.trunc(requestedPosition);
-    if (!Number.isFinite(requestedPosition) || normalizedPosition <= 0) {
-      throw new SimulatorBuilderError(
-        "invalid_position",
-        "La posicion debe ser mayor que 0.",
-      );
-    }
-
-    const items = await listVersionQuestions(editableVersion.id);
-    const ids = items.map((item) => item.id);
-    const index = ids.indexOf(versionQuestionId);
-    if (index !== -1) {
-      ids.splice(index, 1);
-    }
-    const targetIndex = Math.min(normalizedPosition - 1, ids.length);
-    ids.splice(targetIndex, 0, versionQuestionId);
-    await reorderByIds(editableVersion.id, ids);
-  } else {
-    await normalizeVersionQuestionPositions(editableVersion.id);
-  }
+  void requestedPosition;
+  await normalizeVersionQuestionPositions(editableVersion.id);
 
   const finalItems = await listVersionQuestions(editableVersion.id);
   const created = finalItems.find((item) => item.id === versionQuestionId);
@@ -753,19 +719,11 @@ export async function addQuestionsToDraftVersion(
 
   const uniqueIds = Array.from(new Set(normalizedIds));
   const insertedItems: SimulatorVersionQuestion[] = [];
-  let nextPosition = requestedPosition;
+  void requestedPosition;
 
   for (const sourceQuestionId of uniqueIds) {
-    const inserted = await addQuestionToDraftVersion(
-      simulatorId,
-      sourceQuestionId,
-      nextPosition,
-    );
+    const inserted = await addQuestionToDraftVersion(simulatorId, sourceQuestionId);
     insertedItems.push(inserted);
-
-    if (typeof nextPosition === "number" && Number.isFinite(nextPosition)) {
-      nextPosition = Math.trunc(nextPosition) + 1;
-    }
   }
 
   return insertedItems;
@@ -776,36 +734,13 @@ export async function reorderDraftVersionQuestion(
   versionQuestionId: string,
   position: number,
 ): Promise<SimulatorVersionQuestion> {
-  await getSimulatorById(simulatorId);
-  const editableVersion = await getEditableVersionForMutations(simulatorId);
-
-  if (!Number.isFinite(position) || Math.trunc(position) <= 0) {
-    throw new SimulatorBuilderError(
-      "invalid_position",
-      "La posicion debe ser mayor que 0.",
-    );
-  }
-
-  const items = await listVersionQuestions(editableVersion.id);
-  const ids = items.map((item) => item.id);
-  const fromIndex = ids.indexOf(versionQuestionId);
-  if (fromIndex === -1) {
-    throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
-  }
-
-  ids.splice(fromIndex, 1);
-  const targetIndex = Math.min(Math.trunc(position) - 1, ids.length);
-  ids.splice(targetIndex, 0, versionQuestionId);
-
-  await reorderByIds(editableVersion.id, ids);
-
-  const finalItems = await listVersionQuestions(editableVersion.id);
-  const updated = finalItems.find((item) => item.id === versionQuestionId);
-  if (!updated) {
-    throw new SimulatorBuilderError("not_found", "No se encontro la pregunta del borrador.");
-  }
-
-  return updated;
+  void simulatorId;
+  void versionQuestionId;
+  void position;
+  throw new SimulatorBuilderError(
+    "invalid_position",
+    "El orden manual ya no esta disponible. Ajusta el orden de los temas.",
+  );
 }
 
 export async function removeQuestionFromDraftVersion(

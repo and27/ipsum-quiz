@@ -23,6 +23,7 @@ interface ListTopicsOptions {
 
 interface UpdateTopicInput {
   name?: string;
+  displayOrder?: number;
   isActive?: boolean;
 }
 
@@ -35,10 +36,11 @@ function parseTopicRow(row: unknown): Topic | null {
     return null;
   }
 
-  const { id, name, is_active, created_at, updated_at } = row;
+  const { id, name, display_order, is_active, created_at, updated_at } = row;
   if (
     typeof id !== "string" ||
     typeof name !== "string" ||
+    typeof display_order !== "number" ||
     typeof is_active !== "boolean" ||
     typeof created_at !== "string" ||
     typeof updated_at !== "string"
@@ -49,6 +51,7 @@ function parseTopicRow(row: unknown): Topic | null {
   return {
     id,
     name,
+    displayOrder: display_order,
     isActive: is_active,
     createdAt: created_at,
     updatedAt: updated_at,
@@ -75,6 +78,69 @@ function validateTopicName(name: string): string {
   return normalized;
 }
 
+function validateDisplayOrder(displayOrder: number): number {
+  if (!Number.isFinite(displayOrder)) {
+    throw new TopicInputError("invalid_name", "El orden del tema debe ser numerico.");
+  }
+
+  const normalized = Math.trunc(displayOrder);
+  if (normalized <= 0) {
+    throw new TopicInputError("invalid_name", "El orden del tema debe ser mayor que 0.");
+  }
+
+  return normalized;
+}
+
+async function listTopicRows(): Promise<
+  Array<{
+    id: string;
+    display_order: number;
+  }>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("topics")
+    .select("id, display_order")
+    .order("display_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).filter(
+    (row): row is { id: string; display_order: number } =>
+      typeof row?.id === "string" && typeof row?.display_order === "number",
+  );
+}
+
+async function normalizeTopicDisplayOrders(orderedIds: string[]): Promise<void> {
+  const supabase = await createClient();
+  const maxDisplayOrder = orderedIds.length;
+
+  for (let index = 0; index < orderedIds.length; index += 1) {
+    const { error: tempError } = await supabase
+      .from("topics")
+      .update({ display_order: maxDisplayOrder + index + 1 })
+      .eq("id", orderedIds[index]);
+
+    if (tempError) {
+      throw new Error(tempError.message);
+    }
+  }
+
+  for (let index = 0; index < orderedIds.length; index += 1) {
+    const { error: finalError } = await supabase
+      .from("topics")
+      .update({ display_order: index + 1 })
+      .eq("id", orderedIds[index]);
+
+    if (finalError) {
+      throw new Error(finalError.message);
+    }
+  }
+}
+
 function mapPostgresErrorToTopicInputError(error: unknown): never {
   if (isRecord(error) && error.code === "23505") {
     throw new TopicInputError(
@@ -99,7 +165,8 @@ export async function listTopics(
 
   let query = supabase
     .from("topics")
-    .select("id, name, is_active, created_at, updated_at")
+    .select("id, name, display_order, is_active, created_at, updated_at")
+    .order("display_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (!includeInactive) {
@@ -117,14 +184,28 @@ export async function listTopics(
 export async function createTopic(name: string): Promise<Topic> {
   const normalizedName = validateTopicName(name);
   const supabase = await createClient();
+  const { data: maxRow, error: maxError } = await supabase
+    .from("topics")
+    .select("display_order")
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxError) {
+    throw new Error(maxError.message);
+  }
+
+  const nextDisplayOrder =
+    typeof maxRow?.display_order === "number" ? maxRow.display_order + 1 : 1;
 
   const { data, error } = await supabase
     .from("topics")
     .insert({
       name: normalizedName,
+      display_order: nextDisplayOrder,
       is_active: true,
     })
-    .select("id, name, is_active, created_at, updated_at")
+    .select("id, name, display_order, is_active, created_at, updated_at")
     .single();
 
   if (error) {
@@ -144,9 +225,10 @@ export async function updateTopic(
   input: UpdateTopicInput,
 ): Promise<Topic> {
   const hasName = typeof input.name === "string";
+  const hasDisplayOrder = typeof input.displayOrder === "number";
   const hasActive = typeof input.isActive === "boolean";
 
-  if (!hasName && !hasActive) {
+  if (!hasName && !hasDisplayOrder && !hasActive) {
     throw new TopicInputError("no_changes", "No topic changes were provided.");
   }
 
@@ -158,14 +240,37 @@ export async function updateTopic(
     payload.is_active = input.isActive;
   }
 
-  const supabase = await createClient();
+  if (hasDisplayOrder) {
+    const targetDisplayOrder = validateDisplayOrder(input.displayOrder as number);
+    const rows = await listTopicRows();
+    const currentIndex = rows.findIndex((row) => row.id === topicId);
 
-  const { data, error } = await supabase
+    if (currentIndex === -1) {
+      throw new TopicInputError("not_found", "Topic was not found.");
+    }
+
+    const orderedIds = rows.map((row) => row.id);
+    orderedIds.splice(currentIndex, 1);
+    const targetIndex = Math.min(targetDisplayOrder - 1, orderedIds.length);
+    orderedIds.splice(targetIndex, 0, topicId);
+    await normalizeTopicDisplayOrders(orderedIds);
+  }
+
+  const supabase = await createClient();
+  const query = supabase
     .from("topics")
-    .update(payload)
-    .eq("id", topicId)
-    .select("id, name, is_active, created_at, updated_at")
-    .maybeSingle();
+    .select("id, name, display_order, is_active, created_at, updated_at")
+    .eq("id", topicId);
+
+  const { data, error } =
+    Object.keys(payload).length > 0
+      ? await supabase
+          .from("topics")
+          .update(payload)
+          .eq("id", topicId)
+          .select("id, name, display_order, is_active, created_at, updated_at")
+          .maybeSingle()
+      : await query.maybeSingle();
 
   if (error) {
     mapPostgresErrorToTopicInputError(error);
@@ -182,4 +287,3 @@ export async function updateTopic(
 
   return topic;
 }
-

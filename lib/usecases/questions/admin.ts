@@ -71,6 +71,33 @@ async function listConsumedSourceQuestionIds(questionIds: string[]): Promise<Set
   return consumedIds;
 }
 
+async function getTopicDisplayOrderMap(topicIds: string[]): Promise<Map<string, number>> {
+  const uniqueTopicIds = Array.from(new Set(topicIds.filter(Boolean)));
+  const orderMap = new Map<string, number>();
+
+  if (uniqueTopicIds.length === 0) {
+    return orderMap;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("topics")
+    .select("id, display_order")
+    .in("id", uniqueTopicIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of data ?? []) {
+    if (typeof row.id === "string" && typeof row.display_order === "number") {
+      orderMap.set(row.id, row.display_order);
+    }
+  }
+
+  return orderMap;
+}
+
 interface QuestionCreateInput {
   topicId: string;
   statement: string;
@@ -350,7 +377,25 @@ export async function listUnassignedQuestionsForBuilder(limit = 200): Promise<Qu
   });
 
   const consumedIds = await listConsumedSourceQuestionIds(list.items.map((question) => question.id));
-  return list.items.filter((question) => !consumedIds.has(question.id));
+  const availableItems = list.items.filter((question) => !consumedIds.has(question.id));
+  const topicOrderMap = await getTopicDisplayOrderMap(
+    availableItems.map((question) => question.topicId),
+  );
+
+  return availableItems.sort((a, b) => {
+    const aOrder = topicOrderMap.get(a.topicId) ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = topicOrderMap.get(b.topicId) ?? Number.MAX_SAFE_INTEGER;
+
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
+    if (a.topicName !== b.topicName) {
+      return a.topicName.localeCompare(b.topicName);
+    }
+
+    return a.statement.localeCompare(b.statement);
+  });
 }
 
 export async function updateQuestion(
