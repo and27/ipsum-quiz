@@ -1,1 +1,5 @@
-export { getAdminDashboardStats, getAdminStudentDetail } from "./admin";
+export {
+  getAdminDashboardStats,
+  getAdminStudentDetail,
+  getAdminStudentExportData,
+} from "./admin";

@@ -121,3 +121,35 @@ export interface AdminStudentDetailResponse {
   attempts: AdminStudentAttemptRow[];
   topicSummary: AdminStudentTopicSummary[];
 }
+
+export interface AdminStudentExportTopicColumn {
+  topicId: UUID;
+  topicName: string;
+}
+
+export interface AdminStudentExportRow {
+  studentId: UUID;
+  studentName: string;
+  attempts: number;
+  finished: number;
+  expired: number;
+  averageScorePercent: number;
+  totalCorrectAnswers: number;
+  totalQuestions: number;
+  averageElapsedMinutes: number;
+  blankAnswersTotal: number;
+  latestAttemptAt: string | null;
+  topicBreakdown: Record<
+    UUID,
+    {
+      correctCount: number;
+      totalCount: number;
+    }
+  >;
+}
+
+export interface AdminStudentExportData {
+  filters: AdminDashboardFilters;
+  topicColumns: AdminStudentExportTopicColumn[];
+  rows: AdminStudentExportRow[];
+}

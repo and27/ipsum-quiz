@@ -1,4 +1,5 @@
 import type {
+  AdminStudentExportData,
   AdminDashboardFilters,
   AdminDashboardKpis,
   AdminDashboardResponse,
@@ -20,6 +21,8 @@ interface RawAttemptWithSimulatorRow {
   questions_total: number;
   blank_count: number | null;
   started_at: string;
+  finished_at: string | null;
+  expires_at: string;
   simulators:
     | {
         id?: unknown;
@@ -124,7 +127,7 @@ async function loadAttemptsWithFilters(filters: AdminDashboardFilters): Promise<
   let query = supabase
     .from("attempts")
     .select(
-      "id, student_id, simulator_id, status, score_total, questions_total, blank_count, started_at, simulators!inner(id, title, campus)",
+      "id, student_id, simulator_id, status, score_total, questions_total, blank_count, started_at, finished_at, expires_at, simulators!inner(id, title, campus)",
     )
     .in("status", ["finished", "expired"])
     .order("started_at", { ascending: false });
@@ -481,5 +484,172 @@ export async function getAdminStudentDetail(
     topicSummary: Array.from(topicSummaryMap.values()).sort((a, b) =>
       a.topicName.localeCompare(b.topicName),
     ),
+  };
+}
+
+function getElapsedSeconds(row: RawAttemptWithSimulatorRow): number {
+  const startedAt = Date.parse(row.started_at);
+  const endedAt = Date.parse(row.finished_at ?? row.expires_at);
+
+  if (Number.isNaN(startedAt) || Number.isNaN(endedAt)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round((endedAt - startedAt) / 1000));
+}
+
+export async function getAdminStudentExportData(
+  filters: AdminDashboardFilters,
+): Promise<AdminStudentExportData> {
+  const rows = await loadAttemptsWithFilters(filters);
+  const studentNames = await loadStudentLabels(
+    Array.from(new Set(rows.map((row) => row.student_id))),
+  );
+
+  const attemptsById = new Map<string, RawAttemptWithSimulatorRow>();
+  const byStudent = new Map<
+    string,
+    {
+      studentId: string;
+      attempts: number;
+      finished: number;
+      expired: number;
+      scoreSum: number;
+      questionsSum: number;
+      blankAnswersTotal: number;
+      elapsedSecondsSum: number;
+      latestAttemptAt: string | null;
+      topicBreakdown: Map<
+        string,
+        {
+          topicId: string;
+          topicName: string;
+          correctCount: number;
+          totalCount: number;
+        }
+      >;
+    }
+  >();
+
+  for (const row of rows) {
+    attemptsById.set(row.id, row);
+    const safeScore = typeof row.score_total === "number" ? row.score_total : 0;
+    const safeQuestions = typeof row.questions_total === "number" ? row.questions_total : 0;
+    const safeBlank =
+      typeof row.blank_count === "number"
+        ? row.blank_count
+        : Math.max(safeQuestions - safeScore, 0);
+
+    const current = byStudent.get(row.student_id) ?? {
+      studentId: row.student_id,
+      attempts: 0,
+      finished: 0,
+      expired: 0,
+      scoreSum: 0,
+      questionsSum: 0,
+      blankAnswersTotal: 0,
+      elapsedSecondsSum: 0,
+      latestAttemptAt: null,
+      topicBreakdown: new Map(),
+    };
+
+    current.attempts += 1;
+    if (row.status === "finished") {
+      current.finished += 1;
+    }
+    if (row.status === "expired") {
+      current.expired += 1;
+    }
+    current.scoreSum += safeScore;
+    current.questionsSum += safeQuestions;
+    current.blankAnswersTotal += safeBlank;
+    current.elapsedSecondsSum += getElapsedSeconds(row);
+    if (!current.latestAttemptAt || row.started_at > current.latestAttemptAt) {
+      current.latestAttemptAt = row.started_at;
+    }
+
+    byStudent.set(row.student_id, current);
+  }
+
+  const topicColumnMap = new Map<string, { topicId: string; topicName: string }>();
+  const attemptIds = Array.from(attemptsById.keys());
+  if (attemptIds.length > 0) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("attempt_topic_scores")
+      .select("attempt_id, topic_id, correct_count, blank_count, total_count, topics(name)")
+      .in("attempt_id", attemptIds);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    for (const row of (data ?? []) as RawAttemptTopicScoreRow[]) {
+      const attempt = attemptsById.get(row.attempt_id);
+      if (
+        !attempt ||
+        typeof row.topic_id !== "string" ||
+        typeof row.correct_count !== "number" ||
+        typeof row.total_count !== "number"
+      ) {
+        continue;
+      }
+
+      const student = byStudent.get(attempt.student_id);
+      if (!student) {
+        continue;
+      }
+
+      const topicName = extractTopicName(row.topics, row.topic_id);
+      topicColumnMap.set(row.topic_id, { topicId: row.topic_id, topicName });
+
+      const currentTopic = student.topicBreakdown.get(row.topic_id) ?? {
+        topicId: row.topic_id,
+        topicName,
+        correctCount: 0,
+        totalCount: 0,
+      };
+      currentTopic.correctCount += row.correct_count;
+      currentTopic.totalCount += row.total_count;
+      student.topicBreakdown.set(row.topic_id, currentTopic);
+    }
+  }
+
+  const topicColumns = Array.from(topicColumnMap.values()).sort((a, b) =>
+    a.topicName.localeCompare(b.topicName),
+  );
+
+  const exportRows = Array.from(byStudent.values())
+    .map((row) => ({
+      studentId: row.studentId,
+      studentName: studentNames.get(row.studentId) ?? row.studentId.slice(0, 8),
+      attempts: row.attempts,
+      finished: row.finished,
+      expired: row.expired,
+      averageScorePercent: toRoundedPercent(row.scoreSum, row.questionsSum),
+      totalCorrectAnswers: row.scoreSum,
+      totalQuestions: row.questionsSum,
+      averageElapsedMinutes:
+        row.attempts > 0
+          ? Math.round((row.elapsedSecondsSum / row.attempts / 60) * 10) / 10
+          : 0,
+      blankAnswersTotal: row.blankAnswersTotal,
+      latestAttemptAt: row.latestAttemptAt,
+      topicBreakdown: Object.fromEntries(
+        Array.from(row.topicBreakdown.entries()).map(([topicId, topic]) => [
+          topicId,
+          {
+            correctCount: topic.correctCount,
+            totalCount: topic.totalCount,
+          },
+        ]),
+      ),
+    }))
+    .sort((a, b) => b.averageScorePercent - a.averageScorePercent);
+
+  return {
+    filters,
+    topicColumns,
+    rows: exportRows,
   };
 }
