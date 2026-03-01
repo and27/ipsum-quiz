@@ -103,6 +103,10 @@ async function AdminStatsStudentsContent({
   const detailsQuerySuffix = detailsQuery.toString()
     ? `?${detailsQuery.toString()}`
     : "";
+  const exportQuery = new URLSearchParams(detailsQuery);
+  const exportHref = `/api/admin/stats/students/export${
+    exportQuery.toString() ? `?${exportQuery.toString()}` : ""
+  }`;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -113,9 +117,14 @@ async function AdminStatsStudentsContent({
             Resumen de resultados por estudiante.
           </p>
         </div>
-        <Link href={`/protected/admin/stats${detailsQuerySuffix}`} className="text-sm underline">
-          Volver a resumen
-        </Link>
+        <div className="flex items-center gap-3">
+          <a href={exportHref} className="text-sm underline">
+            Descargar CSV
+          </a>
+          <Link href={`/protected/admin/stats${detailsQuerySuffix}`} className="text-sm underline">
+            Volver a resumen
+          </Link>
+        </div>
       </div>
 
       <form className="grid gap-3 rounded-lg border p-4 md:grid-cols-6">
