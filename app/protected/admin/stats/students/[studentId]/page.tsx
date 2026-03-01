@@ -54,6 +54,9 @@ async function AdminStudentStatsDetailContent({
         <div>
           <h1 className="text-2xl font-bold">Estudiante - {detail.studentName}</h1>
           <p className="text-sm text-muted-foreground">{detail.studentId}</p>
+          <p className="text-sm text-muted-foreground">
+            Nota de grado: {detail.gradeScore !== null ? detail.gradeScore : "-"}
+          </p>
         </div>
         <Link href="/protected/admin/stats" className="text-sm underline">
           Volver a estadisticas

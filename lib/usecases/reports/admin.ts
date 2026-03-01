@@ -57,6 +57,12 @@ interface RawProfileRow {
   id: string;
   full_name: string | null;
   email: string | null;
+  grade_score: number | string | null;
+}
+
+interface StudentProfileSummary {
+  label: string;
+  gradeScore: number | null;
 }
 
 interface RawAttemptTopicScoreRow {
@@ -325,16 +331,29 @@ async function loadAttemptsWithFilters(filters: AdminDashboardFilters): Promise<
   return (data ?? []) as RawAttemptWithSimulatorRow[];
 }
 
-async function loadStudentLabels(studentIds: string[]): Promise<Map<string, string>> {
-  const labels = new Map<string, string>();
+function normalizeGradeScoreValue(value: number | string | null): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function loadStudentProfiles(
+  studentIds: string[],
+): Promise<Map<string, StudentProfileSummary>> {
+  const profiles = new Map<string, StudentProfileSummary>();
   if (studentIds.length === 0) {
-    return labels;
+    return profiles;
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, email, grade_score")
     .in("id", studentIds);
 
   if (error) {
@@ -344,10 +363,13 @@ async function loadStudentLabels(studentIds: string[]): Promise<Map<string, stri
   for (const row of (data ?? []) as RawProfileRow[]) {
     const fullName = row.full_name?.trim() ?? "";
     const email = row.email?.trim() ?? "";
-    labels.set(row.id, fullName || email || row.id.slice(0, 8));
+    profiles.set(row.id, {
+      label: fullName || email || row.id.slice(0, 8),
+      gradeScore: normalizeGradeScoreValue(row.grade_score),
+    });
   }
 
-  return labels;
+  return profiles;
 }
 
 async function loadActualBlankCounts(
@@ -532,11 +554,13 @@ export async function getAdminDashboardStats(
     blankAnswersTotal,
   };
 
-  const studentNames = await loadStudentLabels(Array.from(byStudent.keys()));
+  const studentProfiles = await loadStudentProfiles(Array.from(byStudent.keys()));
   const studentRows: AdminDashboardStudentRow[] = Array.from(byStudent.values())
     .map((row) => ({
       studentId: row.studentId,
-      studentName: studentNames.get(row.studentId) ?? row.studentId.slice(0, 8),
+      studentName:
+        studentProfiles.get(row.studentId)?.label ?? row.studentId.slice(0, 8),
+      gradeScore: studentProfiles.get(row.studentId)?.gradeScore ?? null,
       attempts: row.attempts,
       finished: row.finished,
       expired: row.expired,
@@ -602,8 +626,9 @@ export async function getAdminStudentDetail(
     (row) => row.student_id === studentId,
   );
   const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
-  const studentNames = await loadStudentLabels([studentId]);
-  const studentName = studentNames.get(studentId) ?? studentId.slice(0, 8);
+  const studentProfiles = await loadStudentProfiles([studentId]);
+  const studentProfile = studentProfiles.get(studentId);
+  const studentName = studentProfile?.label ?? studentId.slice(0, 8);
 
   let scoreSum = 0;
   let questionsSum = 0;
@@ -682,6 +707,7 @@ export async function getAdminStudentDetail(
   return {
     studentId,
     studentName,
+    gradeScore: studentProfile?.gradeScore ?? null,
     filters,
     attemptsTotal: attempts.length,
     averageScorePercent: toRoundedPercent(scoreSum, questionsSum),
@@ -709,7 +735,7 @@ export async function getAdminStudentExportData(
 ): Promise<AdminStudentExportData> {
   const rows = await loadAttemptsWithFilters(filters);
   const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
-  const studentNames = await loadStudentLabels(
+  const studentProfiles = await loadStudentProfiles(
     Array.from(new Set(rows.map((row) => row.student_id))),
   );
 
@@ -826,7 +852,9 @@ export async function getAdminStudentExportData(
   const exportRows = Array.from(byStudent.values())
     .map((row) => ({
       studentId: row.studentId,
-      studentName: studentNames.get(row.studentId) ?? row.studentId.slice(0, 8),
+      studentName:
+        studentProfiles.get(row.studentId)?.label ?? row.studentId.slice(0, 8),
+      gradeScore: studentProfiles.get(row.studentId)?.gradeScore ?? null,
       attempts: row.attempts,
       finished: row.finished,
       expired: row.expired,

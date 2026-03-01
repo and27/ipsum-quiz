@@ -66,6 +66,7 @@ export interface AdminDashboardSimulatorRow {
 export interface AdminDashboardStudentRow {
   studentId: UUID;
   studentName: string;
+  gradeScore: number | null;
   attempts: number;
   finished: number;
   expired: number;
@@ -128,6 +129,7 @@ export interface AdminStudentAttemptQuestionRow {
 export interface AdminStudentDetailResponse {
   studentId: UUID;
   studentName: string;
+  gradeScore: number | null;
   filters: AdminDashboardFilters;
   attemptsTotal: number;
   averageScorePercent: number;
@@ -144,6 +146,7 @@ export interface AdminStudentExportTopicColumn {
 export interface AdminStudentExportRow {
   studentId: UUID;
   studentName: string;
+  gradeScore: number | null;
   attempts: number;
   finished: number;
   expired: number;

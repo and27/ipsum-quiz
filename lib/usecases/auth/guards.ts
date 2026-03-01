@@ -54,6 +54,7 @@ function parseProfileRow(row: unknown): UserProfile | null {
   const id = row.id;
   const role = row.role;
   const fullName = row.full_name;
+  const rawGradeScore = row.grade_score;
   const createdAt = row.created_at;
   const updatedAt = row.updated_at;
 
@@ -73,10 +74,26 @@ function parseProfileRow(row: unknown): UserProfile | null {
     return null;
   }
 
+  let gradeScore: number | null = null;
+  if (rawGradeScore !== null && rawGradeScore !== undefined) {
+    if (typeof rawGradeScore === "number" && Number.isFinite(rawGradeScore)) {
+      gradeScore = rawGradeScore;
+    } else if (typeof rawGradeScore === "string") {
+      const parsed = Number(rawGradeScore);
+      if (!Number.isFinite(parsed)) {
+        return null;
+      }
+      gradeScore = parsed;
+    } else {
+      return null;
+    }
+  }
+
   return {
     id,
     role,
     fullName,
+    gradeScore,
     createdAt,
     updatedAt,
   };
@@ -99,7 +116,7 @@ export async function getCurrentSessionContext(): Promise<SessionContext> {
 
   const profileResponse = await supabase
     .from("profiles")
-    .select("id, role, full_name, created_at, updated_at")
+    .select("id, role, full_name, grade_score, created_at, updated_at")
     .eq("id", parsedClaims.userId)
     .maybeSingle();
 
@@ -149,4 +166,3 @@ export async function requireAdmin(): Promise<AuthenticatedSessionContext> {
 export async function requireStudent(): Promise<AuthenticatedSessionContext> {
   return requireRole("student");
 }
-

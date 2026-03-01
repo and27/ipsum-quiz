@@ -6,6 +6,7 @@ import { useState } from "react";
 
 interface StudentProfileFormProps {
   initialFullName: string;
+  initialGradeScore: number | null;
   email: string | null;
 }
 
@@ -25,13 +26,33 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-export function StudentProfileForm({ initialFullName, email }: StudentProfileFormProps) {
+function formatGradeScoreValue(value: number | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "";
+  }
+  return String(value);
+}
+
+export function StudentProfileForm({
+  initialFullName,
+  initialGradeScore,
+  email,
+}: StudentProfileFormProps) {
+  const [savedFullName, setSavedFullName] = useState(initialFullName);
+  const [savedGradeScoreInput, setSavedGradeScoreInput] = useState(
+    formatGradeScoreValue(initialGradeScore),
+  );
   const [fullName, setFullName] = useState(initialFullName);
+  const [gradeScoreInput, setGradeScoreInput] = useState(
+    formatGradeScoreValue(initialGradeScore),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const hasChanges = fullName.trim() !== initialFullName.trim();
+  const hasChanges =
+    fullName.trim() !== savedFullName.trim() ||
+    gradeScoreInput.trim() !== savedGradeScoreInput.trim();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,14 +60,25 @@ export function StudentProfileForm({ initialFullName, email }: StudentProfileFor
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      const payload = await parseApiResponse<{ ok: true; fullName: string }>(
+      const payload = await parseApiResponse<{
+        ok: true;
+        fullName: string;
+        gradeScore: number | null;
+      }>(
         await fetch("/api/student/profile", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName }),
+          body: JSON.stringify({
+            fullName,
+            gradeScore:
+              gradeScoreInput.trim().length === 0 ? null : Number(gradeScoreInput),
+          }),
         }),
       );
+      setSavedFullName(payload.fullName);
+      setSavedGradeScoreInput(formatGradeScoreValue(payload.gradeScore));
       setFullName(payload.fullName);
+      setGradeScoreInput(formatGradeScoreValue(payload.gradeScore));
       setSuccessMessage("Perfil actualizado.");
     } catch (error: unknown) {
       setErrorMessage(
@@ -76,6 +108,25 @@ export function StudentProfileForm({ initialFullName, email }: StudentProfileFor
           onChange={(event) => setFullName(event.target.value)}
           required
         />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor="student-profile-grade-score" className="text-sm font-medium">
+          Nota de grado
+        </label>
+        <Input
+          id="student-profile-grade-score"
+          type="number"
+          min="0"
+          max="100"
+          step="0.01"
+          inputMode="decimal"
+          value={gradeScoreInput}
+          placeholder="Ej. 92.50"
+          onChange={(event) => setGradeScoreInput(event.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Campo opcional. Ingresa una nota entre 0 y 100.
+        </p>
       </div>
       {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
       {successMessage ? <p className="text-sm text-green-600">{successMessage}</p> : null}

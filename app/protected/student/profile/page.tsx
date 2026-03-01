@@ -22,6 +22,7 @@ async function StudentProfileContent() {
         </div>
         <StudentProfileForm
           initialFullName={session.profile.fullName ?? ""}
+          initialGradeScore={session.profile.gradeScore}
           email={session.email}
         />
       </div>

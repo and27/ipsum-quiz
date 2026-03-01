@@ -13,11 +13,35 @@ function normalizeFullName(value: unknown): string | null {
   return normalized;
 }
 
+function normalizeGradeScore(value: unknown): number | null | "invalid" {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value.trim())
+        : Number.NaN;
+
+  if (!Number.isFinite(parsed)) {
+    return "invalid";
+  }
+
+  const rounded = Math.round(parsed * 100) / 100;
+  if (rounded < 0 || rounded > 100) {
+    return "invalid";
+  }
+
+  return rounded;
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const session = await requireStudent();
     const body = (await request.json().catch(() => null)) as
-      | { fullName?: unknown }
+      | { fullName?: unknown; gradeScore?: unknown }
       | null;
 
     const fullName = normalizeFullName(body?.fullName);
@@ -34,12 +58,20 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const gradeScore = normalizeGradeScore(body?.gradeScore);
+    if (gradeScore === "invalid") {
+      return NextResponse.json(
+        { error: "La nota de grado debe estar entre 0 y 100." },
+        { status: 400 },
+      );
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update({ full_name: fullName, grade_score: gradeScore })
       .eq("id", session.userId)
-      .select("id, full_name")
+      .select("id, full_name, grade_score")
       .maybeSingle();
 
     if (error) {
@@ -49,7 +81,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Perfil no encontrado." }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, fullName: data.full_name });
+    return NextResponse.json({
+      ok: true,
+      fullName: data.full_name,
+      gradeScore:
+        typeof data.grade_score === "number"
+          ? data.grade_score
+          : typeof data.grade_score === "string"
+            ? Number(data.grade_score)
+            : null,
+    });
   } catch (error) {
     const authResponse = mapAuthGuardErrorToResponse(error);
     if (authResponse) {

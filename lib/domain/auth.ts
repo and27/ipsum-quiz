@@ -8,6 +8,7 @@ export interface UserProfile {
   id: UUID;
   role: AppRole;
   fullName: string | null;
+  gradeScore: number | null;
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
 }
@@ -28,4 +29,3 @@ export interface AuthenticatedSessionContext extends SessionContext {
 export function isAppRole(value: unknown): value is AppRole {
   return APP_ROLES.some((role) => role === value);
 }
-

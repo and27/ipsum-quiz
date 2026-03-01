@@ -24,6 +24,15 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Math.max(1, Math.trunc(parsed));
 }
 
+function parseGradeSort(
+  value: string | undefined,
+): "desc" | "asc" | undefined {
+  if (value === "desc" || value === "asc") {
+    return value;
+  }
+  return undefined;
+}
+
 async function AdminStatsStudentsContent({
   searchParams,
 }: {
@@ -51,6 +60,9 @@ async function AdminStatsStudentsContent({
   const pageSize = parsePositiveInt(
     typeof params.pageSize === "string" ? params.pageSize : undefined,
     20,
+  );
+  const gradeSort = parseGradeSort(
+    typeof params.gradeSort === "string" ? params.gradeSort : undefined,
   );
 
   const dashboard = await getAdminDashboardStats({
@@ -85,13 +97,36 @@ async function AdminStatsStudentsContent({
   if (topicId) {
     detailsQuery.set("topicId", topicId);
   }
+  if (gradeSort) {
+    detailsQuery.set("gradeSort", gradeSort);
+  }
 
-  const totalStudents = dashboard.studentRows.length;
+  const sortedStudentRows = [...dashboard.studentRows].sort((left, right) => {
+    if (!gradeSort) {
+      return 0;
+    }
+
+    const leftScore = left.gradeScore;
+    const rightScore = right.gradeScore;
+    if (leftScore === null && rightScore === null) {
+      return 0;
+    }
+    if (leftScore === null) {
+      return 1;
+    }
+    if (rightScore === null) {
+      return -1;
+    }
+
+    return gradeSort === "asc" ? leftScore - rightScore : rightScore - leftScore;
+  });
+
+  const totalStudents = sortedStudentRows.length;
   const totalPages = Math.max(1, Math.ceil(totalStudents / pageSize));
   const safePage = Math.min(page, totalPages);
   const from = (safePage - 1) * pageSize;
   const to = from + pageSize;
-  const pagedStudentRows = dashboard.studentRows.slice(from, to);
+  const pagedStudentRows = sortedStudentRows.slice(from, to);
 
   const prevQuery = new URLSearchParams(detailsQuery);
   prevQuery.set("page", String(Math.max(1, safePage - 1)));
@@ -203,6 +238,21 @@ async function AdminStatsStudentsContent({
             ))}
           </select>
         </div>
+        <div className="space-y-1">
+          <label htmlFor="students-grade-sort" className="text-xs font-medium text-muted-foreground">
+            Ordenar por nota
+          </label>
+          <select
+            id="students-grade-sort"
+            name="gradeSort"
+            defaultValue={gradeSort ?? ""}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="">Sin orden especial</option>
+            <option value="desc">Mas alta a mas baja</option>
+            <option value="asc">Mas baja a mas alta</option>
+          </select>
+        </div>
         <div className="md:col-span-6 flex gap-2">
           <button
             type="submit"
@@ -210,12 +260,12 @@ async function AdminStatsStudentsContent({
           >
             Aplicar filtros
           </button>
-          <a
+          <Link
             href="/protected/admin/stats/students"
             className="inline-flex h-9 items-center rounded-md border px-4 text-sm"
           >
             Limpiar
-          </a>
+          </Link>
         </div>
       </form>
 
@@ -228,6 +278,7 @@ async function AdminStatsStudentsContent({
             <thead className="bg-muted/40 text-left">
               <tr>
                 <th className="px-4 py-2">Estudiante</th>
+                <th className="px-4 py-2">Nota de grado</th>
                 <th className="px-4 py-2">Intentos</th>
                 <th className="px-4 py-2">Finalizados</th>
                 <th className="px-4 py-2">Expirados</th>
@@ -241,6 +292,9 @@ async function AdminStatsStudentsContent({
               {pagedStudentRows.map((row) => (
                 <tr key={row.studentId} className="border-t">
                   <td className="px-4 py-2">{row.studentName}</td>
+                  <td className="px-4 py-2">
+                    {row.gradeScore !== null ? row.gradeScore : "-"}
+                  </td>
                   <td className="px-4 py-2">{row.attempts}</td>
                   <td className="px-4 py-2">{row.finished}</td>
                   <td className="px-4 py-2">{row.expired}</td>
@@ -261,7 +315,7 @@ async function AdminStatsStudentsContent({
               ))}
               {pagedStudentRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
                     No hay datos de estudiantes para los filtros seleccionados.
                   </td>
                 </tr>

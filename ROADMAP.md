@@ -192,9 +192,9 @@ Goal: Ajustes post salida a produccion para mejorar operacion, velocidad de carg
 - [ ] V1-F6-009: Agregar en detalle por intento las preguntas con respuesta elegida, correcta y en blanco
 - [ ] V1-F6-010: Corregir bug de respuestas en blanco mostradas como incorrectas en detalle admin
 - [ ] V1-F6-011: Instrumentacion y diagnostico del bug de blancas en reportes admin
-- [ ] V1-F6-012: Campo editable `nota de grado` en perfil del estudiante
-- [ ] V1-F6-013: Persistencia y visualizacion de `nota de grado` en admin
-- [ ] V1-F6-014: Ordenamiento en `admin/stats/students` por nota ascendente y descendente
+- [x] V1-F6-012: Campo editable `nota de grado` en perfil del estudiante
+- [x] V1-F6-013: Persistencia y visualizacion de `nota de grado` en admin
+- [x] V1-F6-014: Ordenamiento en `admin/stats/students` por nota ascendente y descendente
 - [ ] V1-F6-015: Soporte base para futura proyeccion academica desde `nota de grado`
 
 ### Notas

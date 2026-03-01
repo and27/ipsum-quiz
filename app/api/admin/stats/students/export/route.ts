@@ -9,6 +9,13 @@ function parseCampus(value: string | null): "canar" | "azogues" | undefined {
   return undefined;
 }
 
+function parseGradeSort(value: string | null): "desc" | "asc" | undefined {
+  if (value === "desc" || value === "asc") {
+    return value;
+  }
+  return undefined;
+}
+
 function escapeCsvValue(value: string | number | null): string {
   if (value === null) {
     return "";
@@ -35,6 +42,7 @@ export async function GET(request: NextRequest) {
     const campus = parseCampus(request.nextUrl.searchParams.get("campus"));
     const dateFrom = request.nextUrl.searchParams.get("dateFrom") || undefined;
     const dateTo = request.nextUrl.searchParams.get("dateTo") || undefined;
+    const gradeSort = parseGradeSort(request.nextUrl.searchParams.get("gradeSort"));
 
     const exportData = await getAdminStudentExportData({
       simulatorId,
@@ -44,8 +52,27 @@ export async function GET(request: NextRequest) {
       dateTo,
     });
 
+    const sortedRows = [...exportData.rows].sort((left, right) => {
+      if (!gradeSort) {
+        return 0;
+      }
+      if (left.gradeScore === null && right.gradeScore === null) {
+        return 0;
+      }
+      if (left.gradeScore === null) {
+        return 1;
+      }
+      if (right.gradeScore === null) {
+        return -1;
+      }
+      return gradeSort === "asc"
+        ? left.gradeScore - right.gradeScore
+        : right.gradeScore - left.gradeScore;
+    });
+
     const header = [
       "Estudiante",
+      "Nota de grado",
       "Intentos",
       "Finalizados",
       "Expirados",
@@ -58,8 +85,9 @@ export async function GET(request: NextRequest) {
       ...exportData.topicColumns.map((topic) => `Aciertos ${topic.topicName}`),
     ];
 
-    const rows = exportData.rows.map((row) => [
+    const rows = sortedRows.map((row) => [
       row.studentName,
+      row.gradeScore ?? "",
       row.attempts,
       row.finished,
       row.expired,
