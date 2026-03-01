@@ -66,6 +66,9 @@ export function SimulatorVersionBuilderManager({
   const [isEditable, setIsEditable] = useState(initialState.isEditable);
   const [lockReason, setLockReason] = useState(initialState.lockReason);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [activeDraftTopicTab, setActiveDraftTopicTab] = useState<string | null>(
+    initialState.items[0]?.topicName ?? null,
+  );
   const [isAdding, setIsAdding] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [isValidating, setIsValidating] = useState(false);
@@ -96,10 +99,17 @@ export function SimulatorVersionBuilderManager({
       grouped.set(key, current);
     }
 
-    return Array.from(grouped.entries()).map(([topicName, questions]) => ({
-      topicName,
-      questions,
-    }));
+    return Array.from(grouped.entries())
+      .map(([topicName, questions]) => ({
+        topicName,
+        questions,
+        firstIndex: availableToAdd.findIndex((question) => question.topicName === topicName),
+      }))
+      .sort((a, b) => a.firstIndex - b.firstIndex)
+      .map(({ topicName, questions }) => ({
+        topicName,
+        questions,
+      }));
   }, [availableToAdd]);
 
   const groupedItems = useMemo(() => {
@@ -113,9 +123,9 @@ export function SimulatorVersionBuilderManager({
     }
 
     return Array.from(grouped.entries()).map(([topicName, questions]) => ({
-      topicName,
-      questions,
-    }));
+        topicName,
+        questions,
+      }));
   }, [items]);
 
   useEffect(() => {
@@ -133,8 +143,26 @@ export function SimulatorVersionBuilderManager({
     );
   }, [availableToAdd, selectedQuestionIds.length]);
 
+  useEffect(() => {
+    if (groupedItems.length === 0) {
+      if (activeDraftTopicTab !== null) {
+        setActiveDraftTopicTab(null);
+      }
+      return;
+    }
+
+    if (
+      !activeDraftTopicTab ||
+      !groupedItems.some((group) => group.topicName === activeDraftTopicTab)
+    ) {
+      setActiveDraftTopicTab(groupedItems[0].topicName);
+    }
+  }, [groupedItems, activeDraftTopicTab]);
+
   const allSelected =
     availableToAdd.length > 0 && selectedQuestionIds.length === availableToAdd.length;
+  const activeDraftGroup =
+    groupedItems.find((group) => group.topicName === activeDraftTopicTab) ?? groupedItems[0];
 
   function toggleQuestionSelection(questionId: string) {
     setSelectedQuestionIds((previous) => {
@@ -440,41 +468,66 @@ export function SimulatorVersionBuilderManager({
           ) : null}
 
           <div className="space-y-4">
-            {groupedItems.map((group) => (
-              <div key={group.topicName} className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{group.topicName}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {group.questions.length} preguntas en este bloque
-                  </span>
-                </div>
-                {group.questions.map((item) => {
-                  const busy = !!rowBusy[item.id];
+            {groupedItems.length > 0 ? (
+              <>
+                <div className="flex flex-wrap gap-2 border-b pb-3">
+                  {groupedItems.map((group) => {
+                    const isActive = group.topicName === activeDraftGroup?.topicName;
 
-                  return (
-                    <div key={item.id} className="space-y-3 rounded-lg border p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge>#{item.position}</Badge>
-                      </div>
-                      <p className="text-sm">{item.statement}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <ConfirmModal
-                          title="Quitar pregunta del borrador"
-                          description="Esta accion quitara la pregunta de la version borrador."
-                          confirmLabel="Quitar"
-                          destructive
-                          disabled={!isEditable}
-                          busy={busy}
-                          triggerLabel="Quitar"
-                          triggerVariant="destructive"
-                          onConfirm={() => handleDelete(item)}
-                        />
-                      </div>
+                    return (
+                      <button
+                        key={group.topicName}
+                        type="button"
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                        }`}
+                        onClick={() => setActiveDraftTopicTab(group.topicName)}
+                      >
+                        {group.topicName}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeDraftGroup ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{activeDraftGroup.topicName}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {activeDraftGroup.questions.length} preguntas en este bloque
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                    {activeDraftGroup.questions.map((item) => {
+                      const busy = !!rowBusy[item.id];
+
+                      return (
+                        <div key={item.id} className="space-y-3 rounded-lg border p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge>#{item.position}</Badge>
+                          </div>
+                          <p className="text-sm">{item.statement}</p>
+                          <div className="flex flex-wrap gap-2">
+                            <ConfirmModal
+                              title="Quitar pregunta del borrador"
+                              description="Esta accion quitara la pregunta de la version borrador."
+                              confirmLabel="Quitar"
+                              destructive
+                              disabled={!isEditable}
+                              busy={busy}
+                              triggerLabel="Quitar"
+                              triggerVariant="destructive"
+                              onConfirm={() => handleDelete(item)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -555,4 +608,3 @@ export function SimulatorVersionBuilderManager({
     </div>
   );
 }
-

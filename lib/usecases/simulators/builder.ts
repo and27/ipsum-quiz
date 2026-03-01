@@ -68,7 +68,10 @@ interface RawVersionQuestionRow {
   statement: string;
   image_url: string | null;
   source_question_id: string | null;
-  topics: { name?: unknown } | Array<{ name?: unknown }> | null;
+  topics:
+    | { name?: unknown; display_order?: unknown }
+    | Array<{ name?: unknown; display_order?: unknown }>
+    | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -332,7 +335,7 @@ async function listVersionQuestions(
   const { data, error } = await supabase
     .from("simulator_version_questions")
     .select(
-      "id, simulator_version_id, position, topic_id, statement, image_url, source_question_id, topics(name)",
+      "id, simulator_version_id, position, topic_id, statement, image_url, source_question_id, topics(name, display_order)",
     )
     .eq("simulator_version_id", versionId)
     .order("position", { ascending: true });
@@ -341,7 +344,28 @@ async function listVersionQuestions(
     throw new Error(error.message);
   }
 
-  return (data ?? [])
+  const sortedRows = ((data ?? []) as RawVersionQuestionRow[]).sort((a, b) => {
+    const aOrder = Array.isArray(a.topics)
+      ? a.topics[0]?.display_order
+      : a.topics?.display_order;
+    const bOrder = Array.isArray(b.topics)
+      ? b.topics[0]?.display_order
+      : b.topics?.display_order;
+    const normalizedAOrder = typeof aOrder === "number" ? aOrder : Number.MAX_SAFE_INTEGER;
+    const normalizedBOrder = typeof bOrder === "number" ? bOrder : Number.MAX_SAFE_INTEGER;
+
+    if (normalizedAOrder !== normalizedBOrder) {
+      return normalizedAOrder - normalizedBOrder;
+    }
+
+    if (a.topic_id !== b.topic_id) {
+      return a.topic_id.localeCompare(b.topic_id);
+    }
+
+    return a.position - b.position;
+  });
+
+  return sortedRows
     .map((row) => parseVersionQuestionRow(row))
     .filter((row): row is SimulatorVersionQuestion => !!row);
 }
