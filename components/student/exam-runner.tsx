@@ -17,6 +17,11 @@ interface ApiErrorResponse {
   error?: string;
 }
 
+function getOptionLabel(position: number): string {
+  const normalized = Math.max(1, Math.trunc(position));
+  return String.fromCharCode(96 + normalized);
+}
+
 function formatRemainingTime(totalSeconds: number): string {
   const safeSeconds = Math.max(0, totalSeconds);
   const minutes = Math.floor(safeSeconds / 60);
@@ -304,12 +309,12 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                   disabled={isExpired}
                 >
                   <span className="block">
-                    {option.position}. {option.text}
+                    {getOptionLabel(option.position)}. {option.text}
                   </span>
                   {option.imageUrl ? (
                     <img
                       src={option.imageUrl}
-                      alt={`Imagen de la opcion ${option.position}`}
+                      alt={`Imagen de la opcion ${getOptionLabel(option.position)}`}
                       className="mt-2 max-h-48 w-full rounded border object-contain"
                     />
                   ) : null}

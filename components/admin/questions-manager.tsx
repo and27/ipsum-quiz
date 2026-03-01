@@ -32,6 +32,11 @@ interface DraftOption {
   isCorrect: boolean;
 }
 
+function getOptionLabel(position: number): string {
+  const normalized = Math.max(1, Math.trunc(position));
+  return String.fromCharCode(96 + normalized);
+}
+
 function createDefaultDraftOptions(): DraftOption[] {
   return [
     { id: crypto.randomUUID(), text: "", isCorrect: true },
@@ -488,16 +493,19 @@ export function QuestionsManager({
               <div className="space-y-2">
                 {newOptions.map((option, index) => (
                   <div key={option.id} className="flex items-center gap-2">
+                    <span className="w-6 text-sm font-medium text-muted-foreground">
+                      {getOptionLabel(index + 1)}.
+                    </span>
                     <input
                       type="radio"
                       name="new-question-correct-option"
                       checked={option.isCorrect}
                       onChange={() => setDraftOptionCorrect(option.id)}
                       disabled={isCreating}
-                      aria-label={`Marcar opcion ${index + 1} como correcta`}
+                      aria-label={`Marcar opcion ${getOptionLabel(index + 1)} como correcta`}
                     />
                     <Input
-                      placeholder={`Texto de opcion ${index + 1}`}
+                      placeholder={`Texto de opcion ${getOptionLabel(index + 1)}`}
                       value={option.text}
                       onChange={(event) =>
                         setNewOptions((prev) =>

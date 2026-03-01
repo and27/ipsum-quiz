@@ -39,6 +39,11 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+function getOptionLabel(position: number): string {
+  const normalized = Math.max(1, Math.trunc(position));
+  return String.fromCharCode(96 + normalized);
+}
+
 function buildEditText(options: QuestionOption[]): Record<string, string> {
   return Object.fromEntries(options.map((option) => [option.id, option.text]));
 }
@@ -200,6 +205,11 @@ export function QuestionOptionsManager({
           trigger={<Button type="button">Crear opcion</Button>}
         >
           <form onSubmit={handleCreateOption} className="space-y-3">
+            {newPosition ? (
+              <p className="text-xs text-muted-foreground">
+                Etiqueta visible: {getOptionLabel(Number(newPosition))}
+              </p>
+            ) : null}
             <Input
               placeholder="Texto de la opcion"
               value={newText}
@@ -286,6 +296,7 @@ export function QuestionOptionsManager({
               return (
                 <div key={option.id} className="space-y-3 rounded-lg border p-3">
                   <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{getOptionLabel(option.position)}</Badge>
                     <Badge variant={option.isActive ? "default" : "secondary"}>
                       {option.isActive ? "Activa" : "Inactiva"}
                     </Badge>
