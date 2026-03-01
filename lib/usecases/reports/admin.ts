@@ -1,5 +1,6 @@
 import type {
   AdminStudentExportData,
+  AdminStudentAttemptQuestionRow,
   AdminDashboardFilters,
   AdminDashboardKpis,
   AdminDashboardResponse,
@@ -34,6 +35,21 @@ interface RawAttemptWithSimulatorRow {
         title?: unknown;
         campus?: unknown;
       }>
+    | null;
+}
+
+interface RawAdminAttemptAnswerDetailRow {
+  attempt_id: string;
+  simulator_version_question_id: string;
+  selected_option_id: string | null;
+  is_correct: boolean | null;
+  simulator_version_questions:
+    | {
+        position?: unknown;
+        statement?: unknown;
+        topic_id?: unknown;
+        topics?: { name?: unknown } | Array<{ name?: unknown }> | null;
+      }
     | null;
 }
 
@@ -117,6 +133,137 @@ function extractTopicName(
     return typeof candidate === "string" ? candidate : fallbackTopicId;
   }
   return typeof topics.name === "string" ? topics.name : fallbackTopicId;
+}
+
+async function loadQuestionResultsByAttempt(
+  attemptIds: string[],
+): Promise<Map<string, AdminStudentAttemptQuestionRow[]>> {
+  const byAttempt = new Map<string, AdminStudentAttemptQuestionRow[]>();
+  if (attemptIds.length === 0) {
+    return byAttempt;
+  }
+
+  const supabase = await createClient();
+  const { data: answerRows, error: answerError } = await supabase
+    .from("attempt_answers")
+    .select(
+      "attempt_id, simulator_version_question_id, selected_option_id, is_correct, simulator_version_questions(position, statement, topic_id, topics(name))",
+    )
+    .in("attempt_id", attemptIds);
+
+  if (answerError) {
+    throw new Error(answerError.message);
+  }
+
+  const parsedAnswers = ((answerRows ?? []) as RawAdminAttemptAnswerDetailRow[]).filter(
+    (row) =>
+      typeof row.attempt_id === "string" &&
+      typeof row.simulator_version_question_id === "string" &&
+      (row.selected_option_id === null || typeof row.selected_option_id === "string") &&
+      (row.is_correct === null || typeof row.is_correct === "boolean"),
+  );
+
+  const selectedOptionIds = parsedAnswers
+    .map((row) => row.selected_option_id)
+    .filter((id): id is string => typeof id === "string")
+    .filter((id, index, self) => self.indexOf(id) === index);
+  const questionIds = parsedAnswers
+    .map((row) => row.simulator_version_question_id)
+    .filter((id, index, self) => self.indexOf(id) === index);
+
+  const selectedTextByOptionId = new Map<string, string>();
+  if (selectedOptionIds.length > 0) {
+    const { data: selectedOptionRows, error: selectedOptionError } = await supabase
+      .from("simulator_version_question_options")
+      .select("id, text")
+      .in("id", selectedOptionIds);
+
+    if (selectedOptionError) {
+      throw new Error(selectedOptionError.message);
+    }
+
+    for (const row of selectedOptionRows ?? []) {
+      if (typeof row.id === "string" && typeof row.text === "string") {
+        selectedTextByOptionId.set(row.id, row.text);
+      }
+    }
+  }
+
+  const correctTextByQuestionId = new Map<string, string>();
+  if (questionIds.length > 0) {
+    const { data: correctOptionRows, error: correctOptionError } = await supabase
+      .from("simulator_version_question_options")
+      .select("simulator_version_question_id, text")
+      .in("simulator_version_question_id", questionIds)
+      .eq("is_correct", true);
+
+    if (correctOptionError) {
+      throw new Error(correctOptionError.message);
+    }
+
+    for (const row of correctOptionRows ?? []) {
+      if (
+        typeof row.simulator_version_question_id === "string" &&
+        typeof row.text === "string" &&
+        !correctTextByQuestionId.has(row.simulator_version_question_id)
+      ) {
+        correctTextByQuestionId.set(row.simulator_version_question_id, row.text);
+      }
+    }
+  }
+
+  for (const row of parsedAnswers) {
+    const question = row.simulator_version_questions;
+    if (
+      !question ||
+      typeof question.position !== "number" ||
+      typeof question.statement !== "string" ||
+      typeof question.topic_id !== "string"
+    ) {
+      continue;
+    }
+
+    const current = byAttempt.get(row.attempt_id) ?? [];
+    current.push({
+      simulatorVersionQuestionId: row.simulator_version_question_id,
+      position: question.position,
+      topicName: extractTopicName(question.topics ?? null, question.topic_id),
+      statement: question.statement,
+      selectedOptionText:
+        typeof row.selected_option_id === "string"
+          ? selectedTextByOptionId.get(row.selected_option_id) ?? null
+          : null,
+      correctOptionText:
+        correctTextByQuestionId.get(row.simulator_version_question_id) ?? null,
+      isCorrect: row.is_correct === true,
+      isBlank: row.selected_option_id === null,
+    });
+    byAttempt.set(row.attempt_id, current);
+  }
+
+  for (const [attemptId, items] of byAttempt.entries()) {
+    byAttempt.set(
+      attemptId,
+      items.sort((a, b) => a.position - b.position),
+    );
+  }
+
+  return byAttempt;
+}
+
+function getElapsedMinutes(
+  startedAt: string,
+  finishedAt: string | null,
+  fallbackExpiresAt: string,
+): number {
+  const startedAtMs = Date.parse(startedAt);
+  const endedAtMs = Date.parse(finishedAt ?? fallbackExpiresAt);
+
+  if (Number.isNaN(startedAtMs) || Number.isNaN(endedAtMs)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round(((endedAtMs - startedAtMs) / 60000) * 10) / 10);
 }
 
 async function loadAttemptsWithFilters(filters: AdminDashboardFilters): Promise<RawAttemptWithSimulatorRow[]> {
@@ -406,6 +553,9 @@ export async function getAdminStudentDetail(
   let questionsSum = 0;
   let blankAnswersTotal = 0;
   const attempts: AdminStudentAttemptRow[] = [];
+  const questionResultsByAttempt = await loadQuestionResultsByAttempt(
+    rows.map((row) => row.id),
+  );
 
   for (const row of rows) {
     const simulator = getSimulatorMeta(row);
@@ -430,9 +580,12 @@ export async function getAdminStudentDetail(
       campus: simulator.campus,
       status: row.status === "expired" ? "expired" : "finished",
       startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      elapsedMinutes: getElapsedMinutes(row.started_at, row.finished_at, row.expires_at),
       scoreTotal: safeScore,
       blankCount: safeBlank,
       questionsTotal: safeQuestions,
+      questionResults: questionResultsByAttempt.get(row.id) ?? [],
     });
   }
 

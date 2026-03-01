@@ -1,3 +1,4 @@
+import { AttemptQuestionDetails } from "@/components/admin/attempt-question-details";
 import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
 import { getAdminStudentDetail } from "@/lib/usecases/reports";
 import Link from "next/link";
@@ -90,44 +91,105 @@ async function AdminStudentStatsDetailContent({
         </div>
       </div>
 
-      <div className="rounded-lg border">
-        <div className="border-b p-4">
+      <div className="space-y-4">
+        <div>
           <h2 className="text-base font-semibold">Intentos</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-muted/40 text-left">
-              <tr>
-                <th className="px-4 py-2">Fecha</th>
-                <th className="px-4 py-2">Simulador</th>
-                <th className="px-4 py-2">Sede</th>
-                <th className="px-4 py-2">Estado</th>
-                <th className="px-4 py-2">Puntaje</th>
-                <th className="px-4 py-2">Blancos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.attempts.map((attempt) => (
-                <tr key={attempt.attemptId} className="border-t">
-                  <td className="px-4 py-2">{new Date(attempt.startedAt).toLocaleString()}</td>
-                  <td className="px-4 py-2">{attempt.simulatorTitle}</td>
-                  <td className="px-4 py-2">{attempt.campus === "canar" ? "Cañar" : "Azogues"}</td>
-                  <td className="px-4 py-2">{attempt.status}</td>
-                  <td className="px-4 py-2">
+        <div className="space-y-4">
+          {detail.attempts.map((attempt) => (
+            <div key={attempt.attemptId} className="rounded-lg border p-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Simulador</p>
+                  <p className="text-sm font-medium">{attempt.simulatorTitle}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Inicio</p>
+                  <p className="text-sm font-medium">{new Date(attempt.startedAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Cierre</p>
+                  <p className="text-sm font-medium">
+                    {attempt.finishedAt ? new Date(attempt.finishedAt).toLocaleString() : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Sede</p>
+                  <p className="text-sm font-medium">{attempt.campus === "canar" ? "Cañar" : "Azogues"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Estado</p>
+                  <p className="text-sm font-medium">{attempt.status}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Tiempo</p>
+                  <p className="text-sm font-medium">{attempt.elapsedMinutes} min</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Puntaje</p>
+                  <p className="text-sm font-medium">
                     {attempt.scoreTotal}/{attempt.questionsTotal}
-                  </td>
-                  <td className="px-4 py-2">{attempt.blankCount}</td>
-                </tr>
-              ))}
-              {detail.attempts.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                    No hay intentos para este estudiante con los filtros seleccionados.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Blancos</p>
+                  <p className="text-sm font-medium">{attempt.blankCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Intento ID</p>
+                  <p className="text-xs text-muted-foreground">{attempt.attemptId}</p>
+                </div>
+              </div>
+
+              <AttemptQuestionDetails questionCount={attempt.questionResults.length}>
+                  {attempt.questionResults.map((question) => (
+                    <div key={question.simulatorVersionQuestionId} className="rounded-md border p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Pregunta {question.position} | Tema: {question.topicName}
+                      </p>
+                      <p className="mt-1 text-sm font-medium">{question.statement}</p>
+                      <p className="mt-2 text-sm">
+                        Respuesta elegida:{" "}
+                        <span className="font-medium">
+                          {question.selectedOptionText ?? "Sin responder"}
+                        </span>
+                      </p>
+                      <p className="text-sm">
+                        Correcta:{" "}
+                        <span className="font-medium">
+                          {question.correctOptionText ?? "No disponible"}
+                        </span>
+                      </p>
+                      <p
+                        className={`text-sm font-medium ${
+                          question.isCorrect
+                            ? "text-green-600"
+                            : question.isBlank
+                              ? "text-amber-600"
+                              : "text-red-500"
+                        }`}
+                      >
+                        {question.isCorrect
+                          ? "Correcta"
+                          : question.isBlank
+                            ? "En blanco"
+                            : "Incorrecta"}
+                      </p>
+                    </div>
+                  ))}
+                  {attempt.questionResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay detalle de preguntas para este intento.
+                    </p>
+                  ) : null}
+              </AttemptQuestionDetails>
+            </div>
+          ))}
+          {detail.attempts.length === 0 ? (
+            <div className="py-6 text-center text-muted-foreground">
+              No hay intentos para este estudiante con los filtros seleccionados.
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

@@ -106,9 +106,23 @@ export interface AdminStudentAttemptRow {
   campus: SimulatorCampus;
   status: "finished" | "expired";
   startedAt: string;
+  finishedAt: string | null;
+  elapsedMinutes: number;
   scoreTotal: number;
   blankCount: number;
   questionsTotal: number;
+  questionResults: AdminStudentAttemptQuestionRow[];
+}
+
+export interface AdminStudentAttemptQuestionRow {
+  simulatorVersionQuestionId: UUID;
+  position: number;
+  topicName: string;
+  statement: string;
+  selectedOptionText: string | null;
+  correctOptionText: string | null;
+  isCorrect: boolean;
+  isBlank: boolean;
 }
 
 export interface AdminStudentDetailResponse {
