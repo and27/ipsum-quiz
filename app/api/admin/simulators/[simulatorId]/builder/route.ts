@@ -1,5 +1,6 @@
 import type {
   AdminSimulatorBuilderAddQuestionRequest,
+  AdminSimulatorBuilderUpdateTopicOrderRequest,
   AdminSimulatorBuilderStateResponse,
 } from "@/lib/domain/contracts";
 import { mapAuthGuardErrorToResponse, requireAdmin } from "@/lib/usecases/auth";
@@ -7,6 +8,7 @@ import {
   addQuestionsToDraftVersion,
   addQuestionToDraftVersion,
   getSimulatorBuilderState,
+  saveDraftVersionTopicOrder,
   SimulatorBuilderError,
 } from "@/lib/usecases/simulators";
 import { NextRequest, NextResponse } from "next/server";
@@ -148,6 +150,67 @@ export async function POST(
         : "No se pudo agregar la pregunta a la version borrador.";
 
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ simulatorId: string }> },
+) {
+  try {
+    await requireAdmin();
+    const { simulatorId } = await context.params;
+    if (!simulatorId) {
+      return NextResponse.json({ error: "ID de simulador invalido." }, { status: 400 });
+    }
+
+    const body = (await request.json().catch(() => null)) as unknown;
+    if (
+      !isObject(body) ||
+      !Array.isArray(body.topicOrder)
+    ) {
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
+    }
+
+    const payload: AdminSimulatorBuilderUpdateTopicOrderRequest = {
+      topicOrder: body.topicOrder
+        .filter(
+          (item): item is { topicId: string; displayOrder: number } =>
+            isObject(item) &&
+            typeof item.topicId === "string" &&
+            typeof item.displayOrder === "number",
+        )
+        .map((item) => ({
+          topicId: item.topicId,
+          displayOrder: item.displayOrder,
+        })),
+    };
+
+    const result = await saveDraftVersionTopicOrder(
+      simulatorId,
+      payload.topicOrder,
+    );
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    const authResponse = mapAuthGuardErrorToResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
+    if (error instanceof SimulatorBuilderError) {
+      if (error.code === "simulator_not_found" || error.code === "not_found") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      if (error.code === "version_locked") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: "No se pudo reordenar el tema del borrador." },
+      { status: 500 },
+    );
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   SimulatorPublishValidation,
   SimulatorVersion,
   SimulatorVersionQuestion,
+  SimulatorVersionTopicOrder,
 } from "@/lib/domain/simulator";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ export type SimulatorBuilderErrorCode =
   | "question_already_consumed"
   | "question_not_eligible"
   | "invalid_position"
+  | "invalid_topic_order"
   | "not_found"
   | "duplicate_question"
   | "publish_validation_failed";
@@ -76,6 +78,7 @@ interface RawVersionQuestionRow {
 
 interface RawVersionTopicOrderRow {
   topic_id: string;
+  topics?: { name?: unknown } | Array<{ name?: unknown }> | null;
   display_order: number;
 }
 
@@ -159,7 +162,9 @@ function parseVersionRow(row: unknown): SimulatorVersion | null {
 }
 
 function extractTopicName(
-  topics: RawVersionQuestionRow["topics"],
+  topics:
+    | RawVersionQuestionRow["topics"]
+    | RawVersionTopicOrderRow["topics"],
   fallbackTopicId: string,
 ): string {
   if (!topics) {
@@ -295,6 +300,37 @@ async function initializeVersionTopicOrder(
   }
 }
 
+async function listVersionTopicOrder(
+  versionId: string,
+): Promise<SimulatorVersionTopicOrder[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("simulator_version_topic_order")
+    .select("topic_id, display_order, topics(name)")
+    .eq("simulator_version_id", versionId)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as RawVersionTopicOrderRow[])
+    .filter(
+      (row) =>
+        typeof row.topic_id === "string" && typeof row.display_order === "number",
+    )
+    .map((row) => ({
+      topicId: row.topic_id,
+      topicName: extractTopicName(row.topics ?? null, row.topic_id),
+      displayOrder: row.display_order,
+    }));
+}
+
+async function getVersionTopicOrderMap(versionId: string): Promise<Map<string, number>> {
+  const items = await listVersionTopicOrder(versionId);
+  return new Map(items.map((item) => [item.topicId, item.displayOrder]));
+}
+
 async function getOrCreateDraftVersion(simulatorId: string): Promise<SimulatorVersion> {
   const supabase = await createClient();
 
@@ -406,11 +442,12 @@ async function getLatestDraftVersion(simulatorId: string): Promise<SimulatorVers
 async function listVersionQuestions(
   versionId: string,
 ): Promise<SimulatorVersionQuestion[]> {
+  const topicOrder = await getVersionTopicOrderMap(versionId);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("simulator_version_questions")
     .select(
-      "id, simulator_version_id, position, topic_id, statement, image_url, source_question_id, topics(name, display_order)",
+      "id, simulator_version_id, position, topic_id, statement, image_url, source_question_id, topics(name)",
     )
     .eq("simulator_version_id", versionId)
     .order("position", { ascending: true });
@@ -420,14 +457,8 @@ async function listVersionQuestions(
   }
 
   const sortedRows = ((data ?? []) as RawVersionQuestionRow[]).sort((a, b) => {
-    const aOrder = Array.isArray(a.topics)
-      ? a.topics[0]?.display_order
-      : a.topics?.display_order;
-    const bOrder = Array.isArray(b.topics)
-      ? b.topics[0]?.display_order
-      : b.topics?.display_order;
-    const normalizedAOrder = typeof aOrder === "number" ? aOrder : Number.MAX_SAFE_INTEGER;
-    const normalizedBOrder = typeof bOrder === "number" ? bOrder : Number.MAX_SAFE_INTEGER;
+    const normalizedAOrder = topicOrder.get(a.topic_id) ?? Number.MAX_SAFE_INTEGER;
+    const normalizedBOrder = topicOrder.get(b.topic_id) ?? Number.MAX_SAFE_INTEGER;
 
     if (normalizedAOrder !== normalizedBOrder) {
       return normalizedAOrder - normalizedBOrder;
@@ -446,10 +477,11 @@ async function listVersionQuestions(
 }
 
 async function normalizeVersionQuestionPositions(versionId: string): Promise<void> {
+  const topicOrder = await getVersionTopicOrderMap(versionId);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("simulator_version_questions")
-    .select("id, position, topic_id, topics(display_order)")
+    .select("id, position, topic_id")
     .eq("simulator_version_id", versionId)
     .order("position", { ascending: true });
 
@@ -461,16 +493,9 @@ async function normalizeVersionQuestionPositions(versionId: string): Promise<voi
     id: string;
     position: number;
     topic_id: string;
-    topics?: { display_order?: unknown } | Array<{ display_order?: unknown }> | null;
   }>).sort((a, b) => {
-    const aOrder = Array.isArray(a.topics)
-      ? a.topics[0]?.display_order
-      : a.topics?.display_order;
-    const bOrder = Array.isArray(b.topics)
-      ? b.topics[0]?.display_order
-      : b.topics?.display_order;
-    const normalizedAOrder = typeof aOrder === "number" ? aOrder : Number.MAX_SAFE_INTEGER;
-    const normalizedBOrder = typeof bOrder === "number" ? bOrder : Number.MAX_SAFE_INTEGER;
+    const normalizedAOrder = topicOrder.get(a.topic_id) ?? Number.MAX_SAFE_INTEGER;
+    const normalizedBOrder = topicOrder.get(b.topic_id) ?? Number.MAX_SAFE_INTEGER;
 
     if (normalizedAOrder !== normalizedBOrder) {
       return normalizedAOrder - normalizedBOrder;
@@ -590,6 +615,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   publishedVersion: SimulatorVersion | null;
   isEditable: boolean;
   lockReason: string | null;
+  topicOrder: SimulatorVersionTopicOrder[];
   items: SimulatorVersionQuestion[];
 }> {
   const simulator = await getSimulatorById(simulatorId);
@@ -600,6 +626,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
   let items: SimulatorVersionQuestion[] = [];
   if (!activeVersion) {
     const newDraft = await getOrCreateDraftVersion(simulatorId);
+    const topicOrder = await listVersionTopicOrder(newDraft.id);
     items = await listVersionQuestions(newDraft.id);
     return {
       simulator,
@@ -608,10 +635,12 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
       publishedVersion,
       isEditable: true,
       lockReason: null,
+      topicOrder,
       items,
     };
   }
 
+  const topicOrder = await listVersionTopicOrder(activeVersion.id);
   items = await listVersionQuestions(activeVersion.id);
   const isEditable = !!draftVersion && !draftVersion.hasAttempts;
   const lockReason = draftVersion
@@ -629,6 +658,7 @@ export async function getSimulatorBuilderState(simulatorId: string): Promise<{
     publishedVersion,
     isEditable,
     lockReason,
+    topicOrder,
     items,
   };
 }
@@ -840,6 +870,99 @@ export async function reorderDraftVersionQuestion(
     "invalid_position",
     "El orden manual ya no esta disponible. Ajusta el orden de los temas.",
   );
+}
+
+export async function saveDraftVersionTopicOrder(
+  simulatorId: string,
+  requestedOrder: Array<{ topicId: string; displayOrder: number }>,
+): Promise<{
+  topicOrder: SimulatorVersionTopicOrder[];
+  items: SimulatorVersionQuestion[];
+}> {
+  await getSimulatorById(simulatorId);
+  const editableVersion = await getEditableVersionForMutations(simulatorId);
+  const currentTopicOrder = await listVersionTopicOrder(editableVersion.id);
+  if (currentTopicOrder.length === 0) {
+    return {
+      topicOrder: [],
+      items: await listVersionQuestions(editableVersion.id),
+    };
+  }
+
+  if (requestedOrder.length !== currentTopicOrder.length) {
+    throw new SimulatorBuilderError(
+      "invalid_topic_order",
+      "El orden de temas esta incompleto.",
+    );
+  }
+
+  const currentTopicIds = new Set(currentTopicOrder.map((item) => item.topicId));
+  const requestedTopicIds = new Set(requestedOrder.map((item) => item.topicId));
+  if (currentTopicIds.size !== requestedTopicIds.size) {
+    throw new SimulatorBuilderError(
+      "invalid_topic_order",
+      "El orden de temas es invalido.",
+    );
+  }
+
+  for (const topicId of requestedTopicIds) {
+    if (!currentTopicIds.has(topicId)) {
+      throw new SimulatorBuilderError(
+        "invalid_topic_order",
+        "El orden de temas es invalido.",
+      );
+    }
+  }
+
+  const normalizedOrder = [...requestedOrder]
+    .map((item) => ({
+      topicId: item.topicId,
+      displayOrder: Number.isFinite(item.displayOrder)
+        ? Math.max(1, Math.trunc(item.displayOrder))
+        : Number.MAX_SAFE_INTEGER,
+    }))
+    .sort((a, b) => {
+      if (a.displayOrder !== b.displayOrder) {
+        return a.displayOrder - b.displayOrder;
+      }
+      return a.topicId.localeCompare(b.topicId);
+    })
+    .map((item, index) => ({
+      topicId: item.topicId,
+      displayOrder: index + 1,
+    }));
+
+  const supabase = await createClient();
+  const tempOffset = normalizedOrder.length + 1000;
+
+  for (const item of normalizedOrder) {
+    const { error: tempError } = await supabase
+      .from("simulator_version_topic_order")
+      .update({ display_order: item.displayOrder + tempOffset })
+      .eq("simulator_version_id", editableVersion.id)
+      .eq("topic_id", item.topicId);
+    if (tempError) {
+      throw new Error(tempError.message);
+    }
+  }
+
+  for (const item of normalizedOrder) {
+    const { error: finalError } = await supabase
+      .from("simulator_version_topic_order")
+      .update({ display_order: item.displayOrder })
+      .eq("simulator_version_id", editableVersion.id)
+      .eq("topic_id", item.topicId);
+    if (finalError) {
+      throw new Error(finalError.message);
+    }
+  }
+
+  await normalizeVersionQuestionPositions(editableVersion.id);
+
+  return {
+    topicOrder: await listVersionTopicOrder(editableVersion.id),
+    items: await listVersionQuestions(editableVersion.id),
+  };
 }
 
 export async function removeQuestionFromDraftVersion(

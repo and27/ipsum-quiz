@@ -45,6 +45,12 @@ export interface SimulatorVersionQuestion {
   sourceQuestionId: UUID | null;
 }
 
+export interface SimulatorVersionTopicOrder {
+  topicId: UUID;
+  topicName: string;
+  displayOrder: number;
+}
+
 export interface PublishValidationIssue {
   code: string;
   message: string;

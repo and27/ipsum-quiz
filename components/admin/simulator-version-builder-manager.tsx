@@ -7,8 +7,10 @@ import type {
   AdminSimulatorPublishValidationResponse,
   Question,
   SimulatorVersionQuestion,
+  SimulatorVersionTopicOrder,
 } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
+import { BaseModal } from "@/components/ui/base-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -65,6 +67,13 @@ export function SimulatorVersionBuilderManager({
   const [publishedVersion, setPublishedVersion] = useState(initialState.publishedVersion);
   const [isEditable, setIsEditable] = useState(initialState.isEditable);
   const [lockReason, setLockReason] = useState(initialState.lockReason);
+  const [topicOrder, setTopicOrder] = useState<SimulatorVersionTopicOrder[]>(
+    initialState.topicOrder,
+  );
+  const [draftTopicOrder, setDraftTopicOrder] = useState<SimulatorVersionTopicOrder[]>(
+    initialState.topicOrder,
+  );
+  const [isTopicOrderModalOpen, setIsTopicOrderModalOpen] = useState(false);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [activeDraftTopicTab, setActiveDraftTopicTab] = useState<string | null>(
     initialState.items[0]?.topicName ?? null,
@@ -90,6 +99,7 @@ export function SimulatorVersionBuilderManager({
   }, [availableQuestions, items]);
 
   const groupedAvailableToAdd = useMemo(() => {
+    const topicOrderIndex = new Map(topicOrder.map((item) => [item.topicId, item.displayOrder]));
     const grouped = new Map<string, Question[]>();
 
     for (const question of availableToAdd) {
@@ -103,14 +113,14 @@ export function SimulatorVersionBuilderManager({
       .map(([topicName, questions]) => ({
         topicName,
         questions,
-        firstIndex: availableToAdd.findIndex((question) => question.topicName === topicName),
+        firstOrder: topicOrderIndex.get(questions[0]?.topicId ?? "") ?? Number.MAX_SAFE_INTEGER,
       }))
-      .sort((a, b) => a.firstIndex - b.firstIndex)
+      .sort((a, b) => a.firstOrder - b.firstOrder)
       .map(({ topicName, questions }) => ({
         topicName,
         questions,
       }));
-  }, [availableToAdd]);
+  }, [availableToAdd, topicOrder]);
 
   const groupedItems = useMemo(() => {
     const grouped = new Map<string, SimulatorVersionQuestion[]>();
@@ -142,6 +152,10 @@ export function SimulatorVersionBuilderManager({
       ),
     );
   }, [availableToAdd, selectedQuestionIds.length]);
+
+  useEffect(() => {
+    setDraftTopicOrder(topicOrder);
+  }, [topicOrder]);
 
   useEffect(() => {
     if (groupedItems.length === 0) {
@@ -193,6 +207,52 @@ export function SimulatorVersionBuilderManager({
     setPublishedVersion(payload.publishedVersion);
     setIsEditable(payload.isEditable);
     setLockReason(payload.lockReason);
+    setTopicOrder(payload.topicOrder);
+    setDraftTopicOrder(payload.topicOrder);
+  }
+
+  function updateDraftTopicDisplayOrder(topicId: string, nextDisplayOrder: number) {
+    setDraftTopicOrder((previous) =>
+      previous.map((item) =>
+        item.topicId === topicId
+          ? { ...item, displayOrder: Math.max(1, Math.trunc(nextDisplayOrder)) }
+          : item,
+      ),
+    );
+  }
+
+  async function handleSaveTopicOrder() {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setValidationResult(null);
+
+    try {
+      const payload = await parseApiResponse<{
+        ok: true;
+        topicOrder: SimulatorVersionTopicOrder[];
+        items: SimulatorVersionQuestion[];
+      }>(
+        await fetch(`/api/admin/simulators/${simulatorId}/builder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topicOrder: draftTopicOrder.map((item) => ({
+              topicId: item.topicId,
+              displayOrder: item.displayOrder,
+            })),
+          }),
+        }),
+      );
+      setTopicOrder(payload.topicOrder);
+      setDraftTopicOrder(payload.topicOrder);
+      setItems(payload.items);
+      setSuccessMessage("Orden de temas actualizado.");
+      setIsTopicOrderModalOpen(false);
+    } catch (error: unknown) {
+      setErrorMessage(
+        getUnknownErrorMessage(error, "No se pudo actualizar el orden de temas."),
+      );
+    }
   }
 
   async function handleAddQuestion(event: React.FormEvent<HTMLFormElement>) {
@@ -344,6 +404,17 @@ export function SimulatorVersionBuilderManager({
     }
   }
 
+  const hasTopicOrderChanges = useMemo(() => {
+    if (topicOrder.length !== draftTopicOrder.length) {
+      return true;
+    }
+    return draftTopicOrder.some(
+      (item, index) =>
+        item.topicId !== topicOrder[index]?.topicId ||
+        item.displayOrder !== topicOrder[index]?.displayOrder,
+    );
+  }, [draftTopicOrder, topicOrder]);
+
   return (
     <div className="flex w-full flex-col gap-6">
       <Card>
@@ -376,6 +447,67 @@ export function SimulatorVersionBuilderManager({
                 </Button>
               ) : null}
             </div>
+          ) : null}
+          {draftTopicOrder.length > 0 ? (
+            <BaseModal
+              open={isTopicOrderModalOpen}
+              onOpenChange={setIsTopicOrderModalOpen}
+              title="Orden de temas"
+              description="Ajusta varias posiciones y guarda el nuevo orden en una sola accion."
+              trigger={
+                <Button type="button" variant="outline" size="sm">
+                  Editar orden de temas
+                </Button>
+              }
+            >
+              <div className="space-y-4">
+                <div className="space-y-2 rounded-md border p-3">
+                  {draftTopicOrder.map((topic) => (
+                    <div
+                      key={topic.topicId}
+                      className="flex items-center justify-between gap-3 rounded-md border p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{topic.topicName}</span>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={topic.displayOrder}
+                        disabled={!isEditable}
+                        onChange={(event) =>
+                          updateDraftTopicDisplayOrder(
+                            topic.topicId,
+                            Number(event.target.value),
+                          )
+                        }
+                        className="h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={!isEditable || !hasTopicOrderChanges}
+                    onClick={handleSaveTopicOrder}
+                  >
+                    Guardar orden
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDraftTopicOrder(topicOrder);
+                      setIsTopicOrderModalOpen(false);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </BaseModal>
           ) : null}
           <form onSubmit={handleAddQuestion} className="space-y-3">
             <div className="space-y-1">
@@ -434,7 +566,7 @@ export function SimulatorVersionBuilderManager({
                 Seleccionadas: {selectedQuestionIds.length}
               </p>
               <p className="text-xs text-muted-foreground">
-                El orden final se agrupa automaticamente por tema segun el orden configurado en Temas.
+                El orden final se agrupa automaticamente por tema segun el orden configurado en esta version.
               </p>
             </div>
             <Button
@@ -535,8 +667,8 @@ export function SimulatorVersionBuilderManager({
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              El orden se calcula por bloques de tema. Si quieres cambiarlo, ajusta el orden en
-              la seccion de Temas.
+              El orden se calcula por bloques de tema. Si quieres cambiarlo, ajusta el orden de
+              temas en este constructor.
             </p>
           )}
         </CardContent>

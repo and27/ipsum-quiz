@@ -15,6 +15,7 @@ export {
   publishDraftVersion,
   removeQuestionFromDraftVersion,
   reorderDraftVersionQuestion,
+  saveDraftVersionTopicOrder,
   SimulatorBuilderError,
   type SimulatorBuilderErrorCode,
   validateDraftVersionBeforePublish,

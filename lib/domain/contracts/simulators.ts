@@ -6,6 +6,7 @@ import type {
   SimulatorStatus,
   SimulatorVersion,
   SimulatorVersionQuestion,
+  SimulatorVersionTopicOrder,
 } from "@/lib/domain/simulator";
 
 export interface AdminSimulatorsListQuery {
@@ -48,6 +49,7 @@ export interface AdminSimulatorBuilderStateResponse {
   publishedVersion: SimulatorVersion | null;
   isEditable: boolean;
   lockReason: string | null;
+  topicOrder: SimulatorVersionTopicOrder[];
   items: SimulatorVersionQuestion[];
 }
 
@@ -59,6 +61,13 @@ export interface AdminSimulatorBuilderAddQuestionRequest {
 
 export interface AdminSimulatorBuilderReorderQuestionRequest {
   position: number;
+}
+
+export interface AdminSimulatorBuilderUpdateTopicOrderRequest {
+  topicOrder: Array<{
+    topicId: string;
+    displayOrder: number;
+  }>;
 }
 
 export interface AdminSimulatorBuilderQuestionResponse {
