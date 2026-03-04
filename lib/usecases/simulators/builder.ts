@@ -74,6 +74,11 @@ interface RawVersionQuestionRow {
     | null;
 }
 
+interface RawVersionTopicOrderRow {
+  topic_id: string;
+  display_order: number;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -222,6 +227,74 @@ async function getSimulatorById(simulatorId: string): Promise<Simulator> {
   return simulator;
 }
 
+async function initializeVersionTopicOrder(
+  versionId: string,
+  sourceVersionId?: string,
+): Promise<void> {
+  const supabase = await createClient();
+
+  let rowsToInsert: Array<{
+    simulator_version_id: string;
+    topic_id: string;
+    display_order: number;
+  }> = [];
+
+  if (sourceVersionId) {
+    const { data: sourceRows, error: sourceError } = await supabase
+      .from("simulator_version_topic_order")
+      .select("topic_id, display_order")
+      .eq("simulator_version_id", sourceVersionId)
+      .order("display_order", { ascending: true });
+
+    if (sourceError) {
+      throw new Error(sourceError.message);
+    }
+
+    rowsToInsert = ((sourceRows ?? []) as RawVersionTopicOrderRow[])
+      .filter(
+        (row) =>
+          typeof row.topic_id === "string" && typeof row.display_order === "number",
+      )
+      .map((row) => ({
+        simulator_version_id: versionId,
+        topic_id: row.topic_id,
+        display_order: row.display_order,
+      }));
+  }
+
+  if (rowsToInsert.length === 0) {
+    const { data: topicRows, error: topicError } = await supabase
+      .from("topics")
+      .select("id")
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (topicError) {
+      throw new Error(topicError.message);
+    }
+
+    rowsToInsert = (topicRows ?? [])
+      .filter((row) => typeof row.id === "string")
+      .map((row, index) => ({
+        simulator_version_id: versionId,
+        topic_id: row.id as string,
+        display_order: index + 1,
+      }));
+  }
+
+  if (rowsToInsert.length === 0) {
+    return;
+  }
+
+  const { error: insertError } = await supabase
+    .from("simulator_version_topic_order")
+    .insert(rowsToInsert);
+
+  if (insertError) {
+    throw new Error(insertError.message);
+  }
+}
+
 async function getOrCreateDraftVersion(simulatorId: string): Promise<SimulatorVersion> {
   const supabase = await createClient();
 
@@ -282,6 +355,8 @@ async function getOrCreateDraftVersion(simulatorId: string): Promise<SimulatorVe
   if (!parsedCreated) {
     throw new Error("Invalid simulator version payload returned from database.");
   }
+
+  await initializeVersionTopicOrder(parsedCreated.id);
 
   return parsedCreated;
 }
@@ -1038,6 +1113,8 @@ export async function duplicatePublishedVersionToDraft(simulatorId: string): Pro
   if (!draftVersion) {
     throw new Error("Payload de version borrador invalido devuelto por la base de datos.");
   }
+
+  await initializeVersionTopicOrder(draftVersion.id, sourceVersion.id);
 
   const sourceQuestions = await listVersionQuestions(sourceVersion.id);
   let copiedQuestions = 0;
