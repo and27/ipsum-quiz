@@ -117,15 +117,15 @@ export function StudentProfileForm({
           id="student-profile-grade-score"
           type="number"
           min="0"
-          max="100"
+          max="10"
           step="0.01"
           inputMode="decimal"
           value={gradeScoreInput}
-          placeholder="Ej. 92.50"
+          placeholder="Ej. 9.50"
           onChange={(event) => setGradeScoreInput(event.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Campo opcional. Ingresa una nota entre 0 y 100.
+          Campo opcional. Ingresa una nota entre 0 y 10.
         </p>
       </div>
       {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}

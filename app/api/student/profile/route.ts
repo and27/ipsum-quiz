@@ -30,7 +30,7 @@ function normalizeGradeScore(value: unknown): number | null | "invalid" {
   }
 
   const rounded = Math.round(parsed * 100) / 100;
-  if (rounded < 0 || rounded > 100) {
+  if (rounded < 0 || rounded > 10) {
     return "invalid";
   }
 
@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest) {
     const gradeScore = normalizeGradeScore(body?.gradeScore);
     if (gradeScore === "invalid") {
       return NextResponse.json(
-        { error: "La nota de grado debe estar entre 0 y 100." },
+        { error: "La nota de grado debe estar entre 0 y 10." },
         { status: 400 },
       );
     }

@@ -86,6 +86,37 @@ interface RawAttemptBlankRow {
   selected_option_id: string | null;
 }
 
+type CanonicalAdmissionTopic =
+  | "sociales"
+  | "naturales"
+  | "abstracto"
+  | "lengua"
+  | "matematicas";
+
+interface AttemptTopicScoreSummary {
+  topicId: string;
+  topicName: string;
+  correctCount: number;
+  blankCount: number;
+  totalCount: number;
+}
+
+const ADMISSION_TOPIC_TOTALS: Record<CanonicalAdmissionTopic, number> = {
+  sociales: 9,
+  naturales: 9,
+  abstracto: 14,
+  lengua: 14,
+  matematicas: 14,
+};
+
+const ADMISSION_TOPIC_ORDER: CanonicalAdmissionTopic[] = [
+  "sociales",
+  "naturales",
+  "abstracto",
+  "lengua",
+  "matematicas",
+];
+
 function parseDateStartIso(value: string | undefined): string | undefined {
   if (!value) {
     return undefined;
@@ -113,6 +144,109 @@ function toRoundedPercent(score: number, total: number): number {
     return 0;
   }
   return Math.round((score / total) * 1000) / 10;
+}
+
+function toRoundedScore(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function normalizeTopicNameKey(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function getCanonicalAdmissionTopic(topicName: string): CanonicalAdmissionTopic | null {
+  const normalized = normalizeTopicNameKey(topicName);
+  if (normalized.includes("social")) {
+    return "sociales";
+  }
+  if (normalized.includes("natural")) {
+    return "naturales";
+  }
+  if (normalized.includes("abstract")) {
+    return "abstracto";
+  }
+  if (normalized.includes("lengua") || normalized.includes("literat")) {
+    return "lengua";
+  }
+  if (normalized.includes("matemat")) {
+    return "matematicas";
+  }
+  return null;
+}
+
+function getTopicExamScore(correctCount: number, blankCount: number, totalCount: number): number {
+  const errors = Math.max(0, totalCount - correctCount - blankCount);
+  return 550 + (correctCount * 450) / totalCount - (errors * 450) / (totalCount * 3);
+}
+
+function getAttemptProjectionScores(
+  topicRows: AttemptTopicScoreSummary[],
+  gradeScore: number | null,
+): {
+  examScore: number | null;
+  postulationScore: number | null;
+} {
+  const canonicalRows = new Map<CanonicalAdmissionTopic, AttemptTopicScoreSummary>();
+
+  for (const row of topicRows) {
+    const canonicalTopic = getCanonicalAdmissionTopic(row.topicName);
+    if (!canonicalTopic) {
+      continue;
+    }
+
+    const current = canonicalRows.get(canonicalTopic) ?? {
+      topicId: row.topicId,
+      topicName: row.topicName,
+      correctCount: 0,
+      blankCount: 0,
+      totalCount: ADMISSION_TOPIC_TOTALS[canonicalTopic],
+    };
+
+    current.correctCount += row.correctCount;
+    current.blankCount += row.blankCount;
+    canonicalRows.set(canonicalTopic, current);
+  }
+
+  if (canonicalRows.size !== ADMISSION_TOPIC_ORDER.length) {
+    return {
+      examScore: null,
+      postulationScore: null,
+    };
+  }
+
+  const topicScores: number[] = [];
+  for (const topic of ADMISSION_TOPIC_ORDER) {
+    const topicRow = canonicalRows.get(topic);
+    if (!topicRow) {
+      return {
+        examScore: null,
+        postulationScore: null,
+      };
+    }
+    topicScores.push(
+      getTopicExamScore(
+        topicRow.correctCount,
+        topicRow.blankCount,
+        ADMISSION_TOPIC_TOTALS[topic],
+      ),
+    );
+  }
+
+  const examScore =
+    topicScores.reduce((sum, score) => sum + score, 0) / ADMISSION_TOPIC_ORDER.length;
+  const roundedExamScore = toRoundedScore(examScore);
+
+  return {
+    examScore: roundedExamScore,
+    postulationScore:
+      gradeScore === null
+        ? null
+        : toRoundedScore(((gradeScore * 100) + roundedExamScore) / 2),
+  };
 }
 
 function getSimulatorMeta(row: RawAttemptWithSimulatorRow): {
@@ -257,6 +391,48 @@ async function loadQuestionResultsByAttempt(
       attemptId,
       items.sort((a, b) => a.position - b.position),
     );
+  }
+
+  return byAttempt;
+}
+
+async function loadTopicScoresByAttempt(
+  attemptIds: string[],
+): Promise<Map<string, AttemptTopicScoreSummary[]>> {
+  const byAttempt = new Map<string, AttemptTopicScoreSummary[]>();
+  if (attemptIds.length === 0) {
+    return byAttempt;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("attempt_topic_scores")
+    .select("attempt_id, topic_id, correct_count, blank_count, total_count, topics(name)")
+    .in("attempt_id", attemptIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of (data ?? []) as RawAttemptTopicScoreRow[]) {
+    if (
+      typeof row.attempt_id !== "string" ||
+      typeof row.topic_id !== "string" ||
+      typeof row.correct_count !== "number" ||
+      typeof row.total_count !== "number"
+    ) {
+      continue;
+    }
+
+    const current = byAttempt.get(row.attempt_id) ?? [];
+    current.push({
+      topicId: row.topic_id,
+      topicName: extractTopicName(row.topics, row.topic_id),
+      correctCount: row.correct_count,
+      blankCount: typeof row.blank_count === "number" ? row.blank_count : 0,
+      totalCount: row.total_count,
+    });
+    byAttempt.set(row.attempt_id, current);
   }
 
   return byAttempt;
@@ -429,7 +605,7 @@ export async function getAdminDashboardStats(
 ): Promise<AdminDashboardResponse> {
   const rows = await loadAttemptsWithFilters(filters);
   const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
-  const supabase = await createClient();
+  const topicScoresByAttempt = await loadTopicScoresByAttempt(rows.map((row) => row.id));
   const bySimulator = new Map<string, {
     simulatorId: string;
     simulatorTitle: string;
@@ -450,6 +626,8 @@ export async function getAdminDashboardStats(
     questionsSum: number;
     blankAnswersTotal: number;
     latestAttemptAt: string | null;
+    latestAttemptId: string | null;
+    latestSimulatorTitle: string | null;
   }>();
   const topicSummaryMap = new Map<string, AdminDashboardTopicRow>();
 
@@ -516,6 +694,8 @@ export async function getAdminDashboardStats(
       questionsSum: 0,
       blankAnswersTotal: 0,
       latestAttemptAt: null,
+      latestAttemptId: null,
+      latestSimulatorTitle: null,
     };
     currentStudent.attempts += 1;
     if (row.status === "finished") {
@@ -529,6 +709,8 @@ export async function getAdminDashboardStats(
     currentStudent.blankAnswersTotal += safeBlank;
     if (!currentStudent.latestAttemptAt || row.started_at > currentStudent.latestAttemptAt) {
       currentStudent.latestAttemptAt = row.started_at;
+      currentStudent.latestAttemptId = row.id;
+      currentStudent.latestSimulatorTitle = simulator.title;
     }
     byStudent.set(row.student_id, currentStudent);
   }
@@ -556,54 +738,48 @@ export async function getAdminDashboardStats(
 
   const studentProfiles = await loadStudentProfiles(Array.from(byStudent.keys()));
   const studentRows: AdminDashboardStudentRow[] = Array.from(byStudent.values())
-    .map((row) => ({
-      studentId: row.studentId,
-      studentName:
-        studentProfiles.get(row.studentId)?.label ?? row.studentId.slice(0, 8),
-      gradeScore: studentProfiles.get(row.studentId)?.gradeScore ?? null,
-      attempts: row.attempts,
-      finished: row.finished,
-      expired: row.expired,
-      averageScorePercent: toRoundedPercent(row.scoreSum, row.questionsSum),
-      blankAnswersTotal: row.blankAnswersTotal,
-      latestAttemptAt: row.latestAttemptAt,
-    }))
+    .map((row) => {
+      const profile = studentProfiles.get(row.studentId);
+      const latestProjection = row.latestAttemptId
+        ? getAttemptProjectionScores(
+            topicScoresByAttempt.get(row.latestAttemptId) ?? [],
+            profile?.gradeScore ?? null,
+          )
+        : { examScore: null, postulationScore: null };
+
+      return {
+        studentId: row.studentId,
+        studentName: profile?.label ?? row.studentId.slice(0, 8),
+        gradeScore: profile?.gradeScore ?? null,
+        latestSimulatorTitle: row.latestSimulatorTitle,
+        latestExamScore: latestProjection.examScore,
+        latestPostulationScore: latestProjection.postulationScore,
+        attempts: row.attempts,
+        finished: row.finished,
+        expired: row.expired,
+        averageScorePercent: toRoundedPercent(row.scoreSum, row.questionsSum),
+        latestAttemptAt: row.latestAttemptAt,
+      };
+    })
     .sort((a, b) => b.attempts - a.attempts);
 
-  const attemptIds = rows.map((row) => row.id);
-  if (attemptIds.length > 0) {
-    const { data: topicRows, error: topicRowsError } = await supabase
-      .from("attempt_topic_scores")
-      .select("attempt_id, topic_id, correct_count, blank_count, total_count, topics(name)")
-      .in("attempt_id", attemptIds);
-
-    if (topicRowsError) {
-      throw new Error(topicRowsError.message);
-    }
-
-    for (const row of (topicRows ?? []) as RawAttemptTopicScoreRow[]) {
-      if (
-        typeof row.topic_id !== "string" ||
-        typeof row.correct_count !== "number" ||
-        typeof row.total_count !== "number"
-      ) {
-        continue;
-      }
-      const current = topicSummaryMap.get(row.topic_id) ?? {
-        topicId: row.topic_id,
-        topicName: extractTopicName(row.topics, row.topic_id),
+  for (const topicRows of topicScoresByAttempt.values()) {
+    for (const row of topicRows) {
+      const current = topicSummaryMap.get(row.topicId) ?? {
+        topicId: row.topicId,
+        topicName: row.topicName,
         correctCount: 0,
         blankCount: 0,
         totalCount: 0,
         averageScorePercent: 0,
       };
 
-      current.correctCount += row.correct_count;
-      current.blankCount += typeof row.blank_count === "number" ? row.blank_count : 0;
-      current.totalCount += row.total_count;
+      current.correctCount += row.correctCount;
+      current.blankCount += row.blankCount;
+      current.totalCount += row.totalCount;
       current.averageScorePercent = toRoundedPercent(current.correctCount, current.totalCount);
 
-      topicSummaryMap.set(row.topic_id, current);
+      topicSummaryMap.set(row.topicId, current);
     }
   }
 
@@ -637,6 +813,7 @@ export async function getAdminStudentDetail(
   const questionResultsByAttempt = await loadQuestionResultsByAttempt(
     rows.map((row) => row.id),
   );
+  const topicScoresByAttempt = await loadTopicScoresByAttempt(rows.map((row) => row.id));
 
   for (const row of rows) {
     const simulator = getSimulatorMeta(row);
@@ -651,6 +828,11 @@ export async function getAdminStudentDetail(
     questionsSum += safeQuestions;
     blankAnswersTotal += safeBlank;
 
+    const projection = getAttemptProjectionScores(
+      topicScoresByAttempt.get(row.id) ?? [],
+      studentProfile?.gradeScore ?? null,
+    );
+
     attempts.push({
       attemptId: row.id,
       simulatorId: simulator.id,
@@ -663,51 +845,40 @@ export async function getAdminStudentDetail(
       scoreTotal: safeScore,
       blankCount: safeBlank,
       questionsTotal: safeQuestions,
+      examScore: projection.examScore,
+      postulationScore: projection.postulationScore,
       questionResults: questionResultsByAttempt.get(row.id) ?? [],
     });
   }
 
   attempts.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 
-  const supabase = await createClient();
   const attemptIds = attempts.map((item) => item.attemptId);
   const topicSummaryMap = new Map<string, AdminStudentTopicSummary>();
-  if (attemptIds.length > 0) {
-    const { data, error } = await supabase
-      .from("attempt_topic_scores")
-      .select("attempt_id, topic_id, correct_count, blank_count, total_count, topics(name)")
-      .in("attempt_id", attemptIds);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    for (const row of (data ?? []) as RawAttemptTopicScoreRow[]) {
-      if (
-        typeof row.topic_id !== "string" ||
-        typeof row.correct_count !== "number" ||
-        typeof row.total_count !== "number"
-      ) {
-        continue;
-      }
-      const current = topicSummaryMap.get(row.topic_id) ?? {
-        topicId: row.topic_id,
-        topicName: extractTopicName(row.topics, row.topic_id),
+  for (const attemptId of attemptIds) {
+    for (const row of topicScoresByAttempt.get(attemptId) ?? []) {
+      const current = topicSummaryMap.get(row.topicId) ?? {
+        topicId: row.topicId,
+        topicName: row.topicName,
         correctCount: 0,
         blankCount: 0,
         totalCount: 0,
       };
-      current.correctCount += row.correct_count;
-      current.blankCount += typeof row.blank_count === "number" ? row.blank_count : 0;
-      current.totalCount += row.total_count;
-      topicSummaryMap.set(row.topic_id, current);
+      current.correctCount += row.correctCount;
+      current.blankCount += row.blankCount;
+      current.totalCount += row.totalCount;
+      topicSummaryMap.set(row.topicId, current);
     }
   }
+
+  const latestAttempt = attempts[0] ?? null;
 
   return {
     studentId,
     studentName,
     gradeScore: studentProfile?.gradeScore ?? null,
+    latestExamScore: latestAttempt?.examScore ?? null,
+    latestPostulationScore: latestAttempt?.postulationScore ?? null,
     filters,
     attemptsTotal: attempts.length,
     averageScorePercent: toRoundedPercent(scoreSum, questionsSum),
@@ -735,6 +906,7 @@ export async function getAdminStudentExportData(
 ): Promise<AdminStudentExportData> {
   const rows = await loadAttemptsWithFilters(filters);
   const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
+  const topicScoresByAttempt = await loadTopicScoresByAttempt(rows.map((row) => row.id));
   const studentProfiles = await loadStudentProfiles(
     Array.from(new Set(rows.map((row) => row.student_id))),
   );
@@ -752,6 +924,7 @@ export async function getAdminStudentExportData(
       blankAnswersTotal: number;
       elapsedSecondsSum: number;
       latestAttemptAt: string | null;
+      latestAttemptId: string | null;
       topicBreakdown: Map<
         string,
         {
@@ -780,6 +953,7 @@ export async function getAdminStudentExportData(
       blankAnswersTotal: 0,
       elapsedSecondsSum: 0,
       latestAttemptAt: null,
+      latestAttemptId: null,
       topicBreakdown: new Map(),
     };
 
@@ -796,6 +970,7 @@ export async function getAdminStudentExportData(
     current.elapsedSecondsSum += getElapsedSeconds(row);
     if (!current.latestAttemptAt || row.started_at > current.latestAttemptAt) {
       current.latestAttemptAt = row.started_at;
+      current.latestAttemptId = row.id;
     }
 
     byStudent.set(row.student_id, current);
@@ -855,6 +1030,18 @@ export async function getAdminStudentExportData(
       studentName:
         studentProfiles.get(row.studentId)?.label ?? row.studentId.slice(0, 8),
       gradeScore: studentProfiles.get(row.studentId)?.gradeScore ?? null,
+      latestExamScore: row.latestAttemptId
+        ? getAttemptProjectionScores(
+            topicScoresByAttempt.get(row.latestAttemptId) ?? [],
+            studentProfiles.get(row.studentId)?.gradeScore ?? null,
+          ).examScore
+        : null,
+      latestPostulationScore: row.latestAttemptId
+        ? getAttemptProjectionScores(
+            topicScoresByAttempt.get(row.latestAttemptId) ?? [],
+            studentProfiles.get(row.studentId)?.gradeScore ?? null,
+          ).postulationScore
+        : null,
       attempts: row.attempts,
       finished: row.finished,
       expired: row.expired,

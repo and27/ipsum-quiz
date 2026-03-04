@@ -106,8 +106,8 @@ async function AdminStatsStudentsContent({
       return 0;
     }
 
-    const leftScore = left.gradeScore;
-    const rightScore = right.gradeScore;
+    const leftScore = left.latestPostulationScore ?? left.latestExamScore;
+    const rightScore = right.latestPostulationScore ?? right.latestExamScore;
     if (leftScore === null && rightScore === null) {
       return 0;
     }
@@ -249,8 +249,22 @@ async function AdminStatsStudentsContent({
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
           >
             <option value="">Sin orden especial</option>
-            <option value="desc">Mas alta a mas baja</option>
-            <option value="asc">Mas baja a mas alta</option>
+            <option value="desc">Ultimo simulador: alta a baja</option>
+            <option value="asc">Ultimo simulador: baja a alta</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="students-page-size" className="text-xs font-medium text-muted-foreground">
+            Filas por pagina
+          </label>
+          <select
+            id="students-page-size"
+            name="pageSize"
+            defaultValue={String(pageSize)}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="20">20</option>
+            <option value="50">50</option>
           </select>
         </div>
         <div className="md:col-span-6 flex gap-2">
@@ -279,11 +293,12 @@ async function AdminStatsStudentsContent({
               <tr>
                 <th className="px-4 py-2">Estudiante</th>
                 <th className="px-4 py-2">Nota de grado</th>
+                <th className="px-4 py-2">Nota examen</th>
+                <th className="px-4 py-2">Nota postulación</th>
                 <th className="px-4 py-2">Intentos</th>
                 <th className="px-4 py-2">Finalizados</th>
                 <th className="px-4 py-2">Expirados</th>
                 <th className="px-4 py-2">Promedio</th>
-                <th className="px-4 py-2">Blancos</th>
                 <th className="px-4 py-2">Ultimo intento</th>
                 <th className="px-4 py-2"></th>
               </tr>
@@ -295,11 +310,16 @@ async function AdminStatsStudentsContent({
                   <td className="px-4 py-2">
                     {row.gradeScore !== null ? row.gradeScore : "-"}
                   </td>
+                  <td className="px-4 py-2">
+                    {row.latestExamScore !== null ? row.latestExamScore : "-"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {row.latestPostulationScore !== null ? row.latestPostulationScore : "-"}
+                  </td>
                   <td className="px-4 py-2">{row.attempts}</td>
                   <td className="px-4 py-2">{row.finished}</td>
                   <td className="px-4 py-2">{row.expired}</td>
                   <td className="px-4 py-2">{row.averageScorePercent}%</td>
-                  <td className="px-4 py-2">{row.blankAnswersTotal}</td>
                   <td className="px-4 py-2">
                     {row.latestAttemptAt ? new Date(row.latestAttemptAt).toLocaleString() : "-"}
                   </td>
@@ -315,7 +335,7 @@ async function AdminStatsStudentsContent({
               ))}
               {pagedStudentRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-6 text-center text-muted-foreground">
                     No hay datos de estudiantes para los filtros seleccionados.
                   </td>
                 </tr>

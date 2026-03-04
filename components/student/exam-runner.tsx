@@ -213,6 +213,9 @@ export function StudentExamRunner({ initialState }: StudentExamRunnerProps) {
                 {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
+            <p className="text-sm text-muted-foreground">
+              Blancos: {finishResult.blankCount}
+            </p>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Revision pregunta por pregunta</p>

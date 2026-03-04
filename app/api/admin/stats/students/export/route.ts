@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
     const header = [
       "Estudiante",
       "Nota de grado",
+      "Nota examen",
+      "Nota postulacion",
       "Intentos",
       "Finalizados",
       "Expirados",
@@ -88,6 +90,8 @@ export async function GET(request: NextRequest) {
     const rows = sortedRows.map((row) => [
       row.studentName,
       row.gradeScore ?? "",
+      row.latestExamScore ?? "",
+      row.latestPostulationScore ?? "",
       row.attempts,
       row.finished,
       row.expired,

@@ -67,11 +67,13 @@ export interface AdminDashboardStudentRow {
   studentId: UUID;
   studentName: string;
   gradeScore: number | null;
+  latestSimulatorTitle: string | null;
+  latestExamScore: number | null;
+  latestPostulationScore: number | null;
   attempts: number;
   finished: number;
   expired: number;
   averageScorePercent: number;
-  blankAnswersTotal: number;
   latestAttemptAt: string | null;
 }
 
@@ -112,6 +114,8 @@ export interface AdminStudentAttemptRow {
   scoreTotal: number;
   blankCount: number;
   questionsTotal: number;
+  examScore: number | null;
+  postulationScore: number | null;
   questionResults: AdminStudentAttemptQuestionRow[];
 }
 
@@ -130,6 +134,8 @@ export interface AdminStudentDetailResponse {
   studentId: UUID;
   studentName: string;
   gradeScore: number | null;
+  latestExamScore: number | null;
+  latestPostulationScore: number | null;
   filters: AdminDashboardFilters;
   attemptsTotal: number;
   averageScorePercent: number;
@@ -147,6 +153,8 @@ export interface AdminStudentExportRow {
   studentId: UUID;
   studentName: string;
   gradeScore: number | null;
+  latestExamScore: number | null;
+  latestPostulationScore: number | null;
   attempts: number;
   finished: number;
   expired: number;

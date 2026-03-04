@@ -63,7 +63,7 @@ async function AdminStudentStatsDetailContent({
         </Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-5">
         <div className="rounded-lg border p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Intentos</p>
           <p className="mt-2 text-2xl font-bold">{detail.attemptsTotal}</p>
@@ -75,6 +75,18 @@ async function AdminStudentStatsDetailContent({
         <div className="rounded-lg border p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Blancos</p>
           <p className="mt-2 text-2xl font-bold">{detail.blankAnswersTotal}</p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Nota examen</p>
+          <p className="mt-2 text-2xl font-bold">
+            {detail.latestExamScore !== null ? detail.latestExamScore : "-"}
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Nota postulacion</p>
+          <p className="mt-2 text-2xl font-bold">
+            {detail.latestPostulationScore !== null ? detail.latestPostulationScore : "-"}
+          </p>
         </div>
       </div>
 
@@ -88,6 +100,9 @@ async function AdminStudentStatsDetailContent({
               {topic.topicName}: {topic.correctCount}/{topic.totalCount} (en blanco: {topic.blankCount})
             </p>
           ))}
+          <p className="text-sm text-muted-foreground">
+            Blancos: {detail.blankAnswersTotal}
+          </p>
           {detail.topicSummary.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay desglose disponible.</p>
           ) : null}
@@ -132,6 +147,18 @@ async function AdminStudentStatsDetailContent({
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Puntaje</p>
                   <p className="text-sm font-medium">
                     {attempt.scoreTotal}/{attempt.questionsTotal}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Nota examen</p>
+                  <p className="text-sm font-medium">
+                    {attempt.examScore !== null ? attempt.examScore : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Nota postulacion</p>
+                  <p className="text-sm font-medium">
+                    {attempt.postulationScore !== null ? attempt.postulationScore : "-"}
                   </p>
                 </div>
                 <div>

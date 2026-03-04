@@ -72,6 +72,7 @@ async function StudentAttemptResultContent({
                 {topic.topicName}: {topic.correctCount}/{topic.totalCount}
               </p>
             ))}
+            <p className="text-sm text-muted-foreground">Blancos: {blankCount}</p>
             {result.attempt.topicScores.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin desglose disponible.</p>
             ) : null}
