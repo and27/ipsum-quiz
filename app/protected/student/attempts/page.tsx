@@ -1,5 +1,6 @@
 import { AuthGuardError, requireStudent } from "@/lib/usecases/auth";
 import { listAttemptHistoryForStudent } from "@/lib/usecases/attempts";
+import { formatDateTimeForEcuador } from "@/lib/utils/datetime";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -37,7 +38,7 @@ async function StudentAttemptHistoryContent() {
                 Puntaje: {attempt.scoreTotal ?? 0}/{attempt.questionsTotal}
               </p>
               <p className="text-xs text-muted-foreground">
-                Inicio: {new Date(attempt.startedAt).toLocaleString()}
+                Inicio: {formatDateTimeForEcuador(attempt.startedAt)}
               </p>
               <Link
                 href={`/protected/student/attempts/${attempt.id}/result`}

@@ -1,5 +1,6 @@
 import { AuthGuardError, requireStudent } from "@/lib/usecases/auth";
 import { getAttemptResultForStudent, StudentAttemptError } from "@/lib/usecases/attempts";
+import { formatDateTimeForEcuador } from "@/lib/utils/datetime";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -54,12 +55,12 @@ async function StudentAttemptResultContent({
             Correctas: {scoreTotal} | Incorrectas: {incorrectCount} | En blanco: {blankCount}
           </p>
           <p className="text-xs text-muted-foreground">
-            Inicio: {new Date(result.attempt.startedAt).toLocaleString()}
+            Inicio: {formatDateTimeForEcuador(result.attempt.startedAt)}
           </p>
           <p className="text-xs text-muted-foreground">
             Cierre:{" "}
             {result.attempt.finishedAt
-              ? new Date(result.attempt.finishedAt).toLocaleString()
+              ? formatDateTimeForEcuador(result.attempt.finishedAt)
               : "-"}
           </p>
         </div>

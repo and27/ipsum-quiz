@@ -1,5 +1,6 @@
 import { mapAuthGuardErrorToResponse, requireAdmin } from "@/lib/usecases/auth";
 import { getAdminStudentExportData } from "@/lib/usecases/reports";
+import { formatDateTimeForEcuador } from "@/lib/utils/datetime";
 import { NextRequest, NextResponse } from "next/server";
 
 function parseCampus(value: string | null): "canar" | "azogues" | undefined {
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
       row.totalQuestions,
       row.averageElapsedMinutes,
       row.blankAnswersTotal,
-      row.latestAttemptAt ? new Date(row.latestAttemptAt).toLocaleString() : "",
+      row.latestAttemptAt ? formatDateTimeForEcuador(row.latestAttemptAt) : "",
       ...exportData.topicColumns.flatMap((topic) => {
         const breakdown = row.topicBreakdown[topic.topicId];
         const ratio = breakdown

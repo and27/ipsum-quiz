@@ -2,6 +2,7 @@ import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
 import { getAdminDashboardStats } from "@/lib/usecases/reports";
 import { listSimulators } from "@/lib/usecases/simulators";
 import { listTopics } from "@/lib/usecases/topics";
+import { formatDateTimeForEcuador } from "@/lib/utils/datetime";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -321,7 +322,7 @@ async function AdminStatsStudentsContent({
                   <td className="px-4 py-2">{row.expired}</td>
                   <td className="px-4 py-2">{row.averageScorePercent}%</td>
                   <td className="px-4 py-2">
-                    {row.latestAttemptAt ? new Date(row.latestAttemptAt).toLocaleString() : "-"}
+                    {row.latestAttemptAt ? formatDateTimeForEcuador(row.latestAttemptAt) : "-"}
                   </td>
                   <td className="px-4 py-2">
                     <Link

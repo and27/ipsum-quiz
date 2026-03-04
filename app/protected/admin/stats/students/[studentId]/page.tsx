@@ -1,6 +1,7 @@
 import { AttemptQuestionDetails } from "@/components/admin/attempt-question-details";
 import { AuthGuardError, requireAdmin } from "@/lib/usecases/auth";
 import { getAdminStudentDetail } from "@/lib/usecases/reports";
+import { formatDateTimeForEcuador } from "@/lib/utils/datetime";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -123,12 +124,12 @@ async function AdminStudentStatsDetailContent({
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Inicio</p>
-                  <p className="text-sm font-medium">{new Date(attempt.startedAt).toLocaleString()}</p>
+                  <p className="text-sm font-medium">{formatDateTimeForEcuador(attempt.startedAt)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Cierre</p>
                   <p className="text-sm font-medium">
-                    {attempt.finishedAt ? new Date(attempt.finishedAt).toLocaleString() : "-"}
+                    {attempt.finishedAt ? formatDateTimeForEcuador(attempt.finishedAt) : "-"}
                   </p>
                 </div>
                 <div>
