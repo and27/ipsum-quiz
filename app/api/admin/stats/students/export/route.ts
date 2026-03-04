@@ -84,7 +84,10 @@ export async function GET(request: NextRequest) {
       "Tiempo promedio (min)",
       "Blancos",
       "Ultimo intento",
-      ...exportData.topicColumns.map((topic) => `Aciertos ${topic.topicName}`),
+      ...exportData.topicColumns.flatMap((topic) => [
+        `Aciertos ${topic.topicName}`,
+        `Blancos ${topic.topicName}`,
+      ]),
     ];
 
     const rows = sortedRows.map((row) => [
@@ -101,12 +104,15 @@ export async function GET(request: NextRequest) {
       row.averageElapsedMinutes,
       row.blankAnswersTotal,
       row.latestAttemptAt ? new Date(row.latestAttemptAt).toLocaleString() : "",
-      ...exportData.topicColumns.map((topic) => {
+      ...exportData.topicColumns.flatMap((topic) => {
         const breakdown = row.topicBreakdown[topic.topicId];
         const ratio = breakdown
           ? `${breakdown.correctCount}/${breakdown.totalCount}`
           : "0/0";
-        return formatExcelRatioText(ratio);
+        return [
+          formatExcelRatioText(ratio),
+          breakdown?.blankCount ?? 0,
+        ];
       }),
     ]);
 

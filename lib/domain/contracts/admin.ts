@@ -168,6 +168,7 @@ export interface AdminStudentExportRow {
     UUID,
     {
       correctCount: number;
+      blankCount: number;
       totalCount: number;
     }
   >;

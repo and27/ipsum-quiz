@@ -931,6 +931,7 @@ export async function getAdminStudentExportData(
           topicId: string;
           topicName: string;
           correctCount: number;
+          blankCount: number;
           totalCount: number;
         }
       >;
@@ -1012,9 +1013,11 @@ export async function getAdminStudentExportData(
         topicId: row.topic_id,
         topicName,
         correctCount: 0,
+        blankCount: 0,
         totalCount: 0,
       };
       currentTopic.correctCount += row.correct_count;
+      currentTopic.blankCount += typeof row.blank_count === "number" ? row.blank_count : 0;
       currentTopic.totalCount += row.total_count;
       student.topicBreakdown.set(row.topic_id, currentTopic);
     }
@@ -1059,6 +1062,7 @@ export async function getAdminStudentExportData(
           topicId,
           {
             correctCount: topic.correctCount,
+            blankCount: topic.blankCount,
             totalCount: topic.totalCount,
           },
         ]),
