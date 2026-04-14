@@ -81,11 +81,6 @@ interface RawAttemptTopicScoreRow {
     | null;
 }
 
-interface RawAttemptBlankRow {
-  attempt_id: string;
-  selected_option_id: string | null;
-}
-
 type CanonicalAdmissionTopic =
   | "sociales"
   | "naturales"
@@ -464,7 +459,8 @@ async function loadAttemptsWithFilters(filters: AdminDashboardFilters): Promise<
       "id, student_id, simulator_id, status, score_total, questions_total, blank_count, started_at, finished_at, expires_at, simulators!inner(id, title, campus)",
     )
     .in("status", ["finished", "expired"])
-    .order("started_at", { ascending: false });
+    .order("started_at", { ascending: false })
+    .limit(200);
 
   if (filters.simulatorId) {
     query = query.eq("simulator_id", filters.simulatorId);
@@ -548,63 +544,10 @@ async function loadStudentProfiles(
   return profiles;
 }
 
-async function loadActualBlankCounts(
-  attemptIds: string[],
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  if (attemptIds.length === 0) {
-    return counts;
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("attempt_answers")
-    .select("attempt_id, selected_option_id")
-    .in("attempt_id", attemptIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  for (const row of (data ?? []) as RawAttemptBlankRow[]) {
-    if (typeof row.attempt_id !== "string" || row.selected_option_id !== null) {
-      continue;
-    }
-    counts.set(row.attempt_id, (counts.get(row.attempt_id) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
-function resolveBlankCountForAttempt(
-  row: RawAttemptWithSimulatorRow,
-  actualBlankCounts: Map<string, number>,
-): number {
-  const actualBlankCount = actualBlankCounts.get(row.id) ?? 0;
-
-  if (typeof row.blank_count === "number") {
-    if (row.blank_count !== actualBlankCount) {
-      console.warn("[reports:admin] blank count mismatch detected", {
-        attemptId: row.id,
-        persistedBlankCount: row.blank_count,
-        actualBlankCount,
-      });
-    }
-    return Math.max(0, actualBlankCount);
-  }
-
-  console.warn("[reports:admin] blank_count missing, using attempt_answers-derived value", {
-    attemptId: row.id,
-    actualBlankCount,
-  });
-  return Math.max(0, actualBlankCount);
-}
-
 export async function getAdminDashboardStats(
   filters: AdminDashboardFilters,
 ): Promise<AdminDashboardResponse> {
   const rows = await loadAttemptsWithFilters(filters);
-  const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
   const topicScoresByAttempt = await loadTopicScoresByAttempt(rows.map((row) => row.id));
   const bySimulator = new Map<string, {
     simulatorId: string;
@@ -654,7 +597,7 @@ export async function getAdminDashboardStats(
 
     const safeScore = typeof row.score_total === "number" ? row.score_total : 0;
     const safeQuestions = typeof row.questions_total === "number" ? row.questions_total : 0;
-    const safeBlank = resolveBlankCountForAttempt(row, actualBlankCounts);
+    const safeBlank = row.blank_count ?? 0;
 
     scoreSum += safeScore;
     questionsSum += safeQuestions;
@@ -801,7 +744,6 @@ export async function getAdminStudentDetail(
   const rows = (await loadAttemptsWithFilters(filters)).filter(
     (row) => row.student_id === studentId,
   );
-  const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
   const studentProfiles = await loadStudentProfiles([studentId]);
   const studentProfile = studentProfiles.get(studentId);
   const studentName = studentProfile?.label ?? studentId.slice(0, 8);
@@ -822,7 +764,7 @@ export async function getAdminStudentDetail(
     }
     const safeScore = typeof row.score_total === "number" ? row.score_total : 0;
     const safeQuestions = typeof row.questions_total === "number" ? row.questions_total : 0;
-    const safeBlank = resolveBlankCountForAttempt(row, actualBlankCounts);
+    const safeBlank = row.blank_count ?? 0;
 
     scoreSum += safeScore;
     questionsSum += safeQuestions;
@@ -905,7 +847,6 @@ export async function getAdminStudentExportData(
   filters: AdminDashboardFilters,
 ): Promise<AdminStudentExportData> {
   const rows = await loadAttemptsWithFilters(filters);
-  const actualBlankCounts = await loadActualBlankCounts(rows.map((row) => row.id));
   const topicScoresByAttempt = await loadTopicScoresByAttempt(rows.map((row) => row.id));
   const studentProfiles = await loadStudentProfiles(
     Array.from(new Set(rows.map((row) => row.student_id))),
@@ -942,7 +883,7 @@ export async function getAdminStudentExportData(
     attemptsById.set(row.id, row);
     const safeScore = typeof row.score_total === "number" ? row.score_total : 0;
     const safeQuestions = typeof row.questions_total === "number" ? row.questions_total : 0;
-    const safeBlank = resolveBlankCountForAttempt(row, actualBlankCounts);
+    const safeBlank = row.blank_count ?? 0;
 
     const current = byStudent.get(row.student_id) ?? {
       studentId: row.student_id,
