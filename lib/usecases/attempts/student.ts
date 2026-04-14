@@ -703,16 +703,6 @@ async function resolveAttemptBlankCount(
   return count ?? 0;
 }
 
-async function expireAttemptIfActive(
-  supabase: DbClient,
-  attemptId: string,
-): Promise<void> {
-  await closeAttemptWithScores(supabase, {
-    attemptId,
-    status: "expired",
-  });
-}
-
 export async function startOrResumeAttemptForStudent(input: {
   simulatorId: string;
   studentId: string;
@@ -793,8 +783,6 @@ export async function getActiveAttemptForStudent(input: {
 
   const now = Date.now();
   if (Date.parse(activeAttempt.expires_at) <= now) {
-    await expireAttemptIfActive(supabase, activeAttempt.id);
-
     throw new StudentAttemptError(
       "active_attempt_not_found",
       "No active attempt found for this simulator.",
@@ -852,8 +840,6 @@ export async function saveAttemptAnswerForStudent(input: {
   }
 
   if (Date.parse(attemptRow.expires_at) <= Date.now()) {
-    await expireAttemptIfActive(supabase, input.attemptId);
-
     throw new StudentAttemptError(
       "attempt_not_active",
       "Attempt is no longer active.",
@@ -957,7 +943,6 @@ export async function getAttemptExamStateForStudent(input: {
   }
 
   if (Date.parse(attemptRow.expires_at) <= Date.now()) {
-    await expireAttemptIfActive(supabase, attemptRow.id);
     throw new StudentAttemptError("attempt_expired", "Attempt has expired.");
   }
 
